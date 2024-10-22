@@ -75,7 +75,7 @@ func (m *Migration) Latest() error {
 }
 
 func getLatestMigrationVersion() (int64, error) {
-	files, err := os.ReadDir("./migrations")
+	files, err := os.ReadDir("./internal/migrations")
 	if err != nil {
 		return 0, err
 	}
