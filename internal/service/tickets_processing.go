@@ -42,7 +42,8 @@ func (ts *TicketsService) SearchByFullSurname(ctx context.Context, surname *stri
 		log.Fatalln("service.SearchByFullSurname: Пустой инстанс бота")
 	}
 
-	resp, err := ts.repo.SearchByFullSurname(ctx, *surname)
+	formattedSurname := strings.ToLower(*surname)
+	resp, err := ts.repo.SearchByFullSurname(ctx, formattedSurname)
 	if err != nil || resp == nil {
 		msg := tgbotapi.NewMessage(*chatID, "Покупатель с заданной фамилией не найден")
 		bot.Send(msg)
@@ -71,7 +72,8 @@ func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *
 		log.Fatalln("service.SearchBySurnamePart: Пустой инстанс бота")
 	}
 
-	respList, err := ts.repo.SearchBySurnamePart(ctx, *surnamePart)
+	formattedSurname := strings.ToLower(*surnamePart + "%")
+	respList, err := ts.repo.SearchBySurnamePart(ctx, formattedSurname)
 	if err != nil || len(respList) == 0 {
 		msg := tgbotapi.NewMessage(*chatID, "Покупателей с такими фамилиями не найдено.")
 		bot.Send(msg)

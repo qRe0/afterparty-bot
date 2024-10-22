@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/qRe0/afterparty-bot/internal/configs"
@@ -53,9 +52,8 @@ func (tr *TicketsRepo) SearchByFullSurname(ctx context.Context, surname string) 
 	var name, ticketType string
 	var id string
 
-	formatedSurname := strings.ToLower(surname)
 	query := "SELECT id, full_name, ticket_type FROM tickets WHERE surname=$1"
-	err := tr.db.QueryRow(query, formatedSurname).Scan(&id, &name, &ticketType)
+	err := tr.db.QueryRow(query, surname).Scan(&id, &name, &ticketType)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +68,7 @@ func (tr *TicketsRepo) SearchByFullSurname(ctx context.Context, surname string) 
 
 func (tr *TicketsRepo) SearchBySurnamePart(ctx context.Context, surnamePart string) ([]models.TicketResponse, error) {
 	query := "SELECT id, full_name, ticket_type  FROM tickets WHERE surname LIKE $1"
-	formatedSurname := surnamePart + "%"
-	rows, err := tr.db.QueryContext(ctx, query, formatedSurname)
+	rows, err := tr.db.QueryContext(ctx, query, surnamePart)
 	if err != nil {
 		return nil, err
 	}
