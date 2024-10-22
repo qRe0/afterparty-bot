@@ -12,26 +12,26 @@ import (
 )
 
 func Run() error {
-	// Загрузка переменных окружения
+	// Loading environmental variables
 	cfg, err := configs.LoadEnv()
 	if err != nil {
 		return fmt.Errorf("app.LoadEnv(): не удалось загрузить переменные окружения: %v", err)
 	}
 
-	// Инициализация базы данных
+	// Database initialization
 	db, err := repo.Init(cfg.DB)
 	if err != nil {
 		return fmt.Errorf("app.Init(): не удалось инициализировать базу данных: %v", err)
 	}
 
-	// Инициализация бота
+	// Bot instance initialization
 	botInstance, err := tgbotapi.NewBotAPI(cfg.TG.Token)
 	if err != nil {
 		return fmt.Errorf("app.NewBotAPI(): не удалось инициализировать экземпляр Telegram-бота: %v", err)
 	}
 	botInstance.Debug = true
 
-	// Инициализация слоев проекта
+	// Layers initialization
 	repository := repo.NewTicketsRepository(db, cfg.DB)
 	service := serv.NewTicketsService(repository)
 	handler := handlers.NewMessagesHandler(service)
@@ -40,7 +40,7 @@ func Run() error {
 	u.Timeout = 300
 	updates := botInstance.GetUpdatesChan(u)
 
-	// Создаем канал для ограничения одновременной обработки до 5 запросов
+	// Channel to limit count of requests up to 5 at the same time
 	ch := make(chan struct{}, 5)
 
 	var wg sync.WaitGroup
@@ -48,17 +48,15 @@ func Run() error {
 		if update.Message != nil {
 			wg.Add(1)
 
-			// Запускаем горутину для обработки каждого сообщения
 			go func(update tgbotapi.Update) {
 				defer wg.Done()
 
-				// Ожидание разрешения через канал
+				// Waiting for data
 				ch <- struct{}{}
 
-				// Обработка сообщения
 				handler.HandleMessages(update, botInstance)
 
-				// Освобождаем канал
+				// Clearing channel
 				<-ch
 			}(update)
 		}
