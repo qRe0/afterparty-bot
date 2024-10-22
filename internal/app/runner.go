@@ -7,6 +7,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/qRe0/afterparty-bot/internal/configs"
 	"github.com/qRe0/afterparty-bot/internal/handlers"
+	"github.com/qRe0/afterparty-bot/internal/migrations"
 	repo "github.com/qRe0/afterparty-bot/internal/repository"
 	serv "github.com/qRe0/afterparty-bot/internal/service"
 )
@@ -15,19 +16,30 @@ func Run() error {
 	// Loading environmental variables
 	cfg, err := configs.LoadEnv()
 	if err != nil {
-		return fmt.Errorf("app.LoadEnv(): не удалось загрузить переменные окружения: %v", err)
+		return fmt.Errorf("app.LoadEnv(): failed to load env vars: %v", err)
 	}
 
 	// Database initialization
 	db, err := repo.Init(cfg.DB)
 	if err != nil {
-		return fmt.Errorf("app.Init(): не удалось инициализировать базу данных: %v", err)
+		return fmt.Errorf("app.Init(): failed to init database: %v", err)
+	}
+
+	// DB migrator initialization
+	migrator, err := migrations.NewMigrator(db)
+	if err != nil {
+		return fmt.Errorf("app.NewMigrator(): failed to init database migrtor: %v", err)
+	}
+	// Migrating database to latest version
+	err = migrator.Latest()
+	if err != nil {
+		return fmt.Errorf("app.migrator.Latest(): failed to migrate database to latest version: %v", err)
 	}
 
 	// Bot instance initialization
 	botInstance, err := tgbotapi.NewBotAPI(cfg.TG.Token)
 	if err != nil {
-		return fmt.Errorf("app.NewBotAPI(): не удалось инициализировать экземпляр Telegram-бота: %v", err)
+		return fmt.Errorf("app.NewBotAPI(): failed to init telegram bot instance: %v", err)
 	}
 	botInstance.Debug = true
 
