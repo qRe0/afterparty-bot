@@ -1,17 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
-	configs "github.com/qRe0/afterparty-bot/config"
+	_ "github.com/lib/pq"
+	"github.com/qRe0/afterparty-bot/internal/app"
 )
 
 func main() {
-	cfg, err := configs.LoadEnv()
+	err := app.Run()
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	fmt.Printf("Envs: %+v", cfg)
 }
