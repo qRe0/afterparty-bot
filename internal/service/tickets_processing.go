@@ -2,13 +2,12 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/qRe0/afterparty-bot/internal/models"
 	"github.com/qRe0/afterparty-bot/internal/repository"
+	"github.com/qRe0/afterparty-bot/internal/shared"
 )
 
 const (
@@ -50,7 +49,7 @@ func (ts *TicketsService) SearchByFullSurname(ctx context.Context, surname *stri
 		return
 	}
 
-	mappedResp := responseMapper(resp)
+	mappedResp := shared.ResponseMapper(resp)
 	msg := tgbotapi.NewMessage(*chatID, mappedResp)
 	bot.Send(msg)
 }
@@ -83,22 +82,9 @@ func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *
 	var result strings.Builder
 	result.WriteString("Найдены следующие покупатели:\n\n")
 	for _, resp := range respList {
-		result.WriteString(responseMapper(&resp) + "\n\n")
+		result.WriteString(shared.ResponseMapper(&resp) + "\n\n")
 	}
 
 	msg := tgbotapi.NewMessage(*chatID, result.String())
 	bot.Send(msg)
-}
-
-func responseMapper(resp *models.TicketResponse) string {
-	switch resp.TicketType {
-	case "ОРГ":
-		return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s", resp.Id, resp.Name, resp.TicketType, OrgLace)
-	case "ВИП":
-		return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s", resp.Id, resp.Name, resp.TicketType, VipLace)
-	case "БАЗОВЫЙ":
-		return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s", resp.Id, resp.Name, resp.TicketType, DefaultLace)
-	}
-
-	return "Неизвестный тип билета"
 }
