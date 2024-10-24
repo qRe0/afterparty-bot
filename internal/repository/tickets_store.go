@@ -24,6 +24,9 @@ func NewTicketsRepository(db *sqlx.DB, cfg configs.DBConfig) *TicketsRepo {
 
 const (
 	connectingStringTemplate = "postgres://%s:%s@%s:%s/%s?sslmode=disable"
+
+	findClientByFullSurname = "SELECT id, full_name, ticket_type FROM tickets WHERE surname=$1"
+	findClientBySurnamePart = "SELECT id, full_name, ticket_type  FROM tickets WHERE surname LIKE $1"
 )
 
 func Init(cfg configs.DBConfig) (*sqlx.DB, error) {
@@ -52,8 +55,7 @@ func (tr *TicketsRepo) SearchByFullSurname(ctx context.Context, surname string) 
 	var name, ticketType string
 	var id string
 
-	query := "SELECT id, full_name, ticket_type FROM tickets WHERE surname=$1"
-	err := tr.db.QueryRow(query, surname).Scan(&id, &name, &ticketType)
+	err := tr.db.QueryRow(findClientByFullSurname, surname).Scan(&id, &name, &ticketType)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +69,8 @@ func (tr *TicketsRepo) SearchByFullSurname(ctx context.Context, surname string) 
 }
 
 func (tr *TicketsRepo) SearchBySurnamePart(ctx context.Context, surnamePart string) ([]models.TicketResponse, error) {
-	query := "SELECT id, full_name, ticket_type  FROM tickets WHERE surname LIKE $1"
-	rows, err := tr.db.QueryContext(ctx, query, surnamePart)
+	surnamePattern := surnamePart + "%"
+	rows, err := tr.db.QueryContext(ctx, findClientBySurnamePart, surnamePattern)
 	if err != nil {
 		return nil, err
 	}

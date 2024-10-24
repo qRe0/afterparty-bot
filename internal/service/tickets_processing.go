@@ -71,7 +71,7 @@ func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *
 		log.Fatalln("service.SearchBySurnamePart: Пустой инстанс бота")
 	}
 
-	formattedSurname := strings.ToLower(*surnamePart + "%")
+	formattedSurname := strings.ToLower(*surnamePart)
 	respList, err := ts.repo.SearchBySurnamePart(ctx, formattedSurname)
 	if err != nil || len(respList) == 0 {
 		msg := tgbotapi.NewMessage(*chatID, "Покупателей с такими фамилиями не найдено.")
