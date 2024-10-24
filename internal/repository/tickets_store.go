@@ -25,8 +25,8 @@ func NewTicketsRepository(db *sqlx.DB, cfg configs.DBConfig) *TicketsRepo {
 const (
 	connectingStringTemplate = "postgres://%s:%s@%s:%s/%s?sslmode=disable"
 
-	findClientByFullSurname = "SELECT id, full_name, ticket_type FROM tickets WHERE surname=$1"
-	findClientBySurnamePart = "SELECT id, full_name, ticket_type  FROM tickets WHERE surname LIKE $1"
+	findClientByFullSurname = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE surname=$1"
+	findClientBySurnamePart = "SELECT id, full_name, ticket_type, passed_control_zone  FROM tickets WHERE surname LIKE $1"
 )
 
 func Init(cfg configs.DBConfig) (*sqlx.DB, error) {
@@ -54,16 +54,18 @@ func Init(cfg configs.DBConfig) (*sqlx.DB, error) {
 func (tr *TicketsRepo) SearchByFullSurname(ctx context.Context, surname string) (*models.TicketResponse, error) {
 	var name, ticketType string
 	var id string
+	var passed bool
 
-	err := tr.db.QueryRow(findClientByFullSurname, surname).Scan(&id, &name, &ticketType)
+	err := tr.db.QueryRow(findClientByFullSurname, surname).Scan(&id, &name, &ticketType, &passed)
 	if err != nil {
 		return nil, err
 	}
 
 	resp := &models.TicketResponse{
-		Id:         id,
-		Name:       name,
-		TicketType: ticketType,
+		Id:                id,
+		Name:              name,
+		TicketType:        ticketType,
+		PassedControlZone: passed,
 	}
 	return resp, nil
 }
@@ -79,7 +81,7 @@ func (tr *TicketsRepo) SearchBySurnamePart(ctx context.Context, surnamePart stri
 	var users []models.TicketResponse
 	for rows.Next() {
 		var user models.TicketResponse
-		err := rows.Scan(&user.Id, &user.Name, &user.TicketType)
+		err := rows.Scan(&user.Id, &user.Name, &user.TicketType, &user.PassedControlZone)
 		if err != nil {
 			return nil, err
 		}

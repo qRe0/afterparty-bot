@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	OrgLace     = "Красный"
-	VipLace     = "Синий"
-	DefaultLace = "Желтый"
+	OrgLace     = "КРАСНЫЙ"
+	VipLace     = "СИНИЙ"
+	DefaultLace = "ЖЕЛТЫЙ"
 )
 
 func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
@@ -27,14 +27,26 @@ func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
 }
 
 func ResponseMapper(resp *models.TicketResponse) string {
+	successEmoji := "✅"
+	failEmoji := "❌"
+
+	var laceColor string
 	switch resp.TicketType {
 	case "ОРГ":
-		return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s", resp.Id, resp.Name, resp.TicketType, OrgLace)
+		laceColor = OrgLace
 	case "ВИП":
-		return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s", resp.Id, resp.Name, resp.TicketType, VipLace)
+		laceColor = VipLace
 	case "БАЗОВЫЙ":
-		return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s", resp.Id, resp.Name, resp.TicketType, DefaultLace)
+		laceColor = DefaultLace
+	default:
+		return "Неизвестный тип билета"
 	}
 
-	return "Неизвестный тип билета"
+	controlStatus := failEmoji
+	if resp.PassedControlZone {
+		controlStatus = successEmoji
+	}
+
+	return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s\nПрошел контроль: %s",
+		resp.Id, resp.Name, resp.TicketType, laceColor, controlStatus)
 }
