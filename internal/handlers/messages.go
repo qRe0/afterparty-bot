@@ -47,7 +47,6 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				mh.service.SearchBySurnamePart(ctx, &update.Message.Text, &chatID, bot)
 			}
 		}
-
 		shared.ShowOptions(chatID, bot)
 	}
 }
