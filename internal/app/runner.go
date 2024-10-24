@@ -38,7 +38,7 @@ func Run() error {
 	}
 
 	repository := repo.NewTicketsRepository(db, cfg.DB)
-	service := serv.NewTicketsService(repository)
+	service := serv.NewTicketsService(repository, cfg.LacesColor)
 	handler := handlers.NewMessagesHandler(service)
 
 	u := tgbotapi.NewUpdate(0)

@@ -7,17 +7,20 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/qRe0/afterparty-bot/internal/configs"
 	"github.com/qRe0/afterparty-bot/internal/repository"
 	"github.com/qRe0/afterparty-bot/internal/shared"
 )
 
 type TicketsService struct {
 	repo *repository.TicketsRepo
+	cfg  configs.LacesColors
 }
 
-func NewTicketsService(repo *repository.TicketsRepo) *TicketsService {
+func NewTicketsService(repo *repository.TicketsRepo, cfg configs.LacesColors) *TicketsService {
 	return &TicketsService{
 		repo: repo,
+		cfg:  cfg,
 	}
 }
 
@@ -52,7 +55,7 @@ func (ts *TicketsService) SearchByFullSurname(ctx context.Context, surname *stri
 			bot.Send(msg)
 			return
 		}
-		mappedResp := shared.ResponseMapper(resp)
+		mappedResp := shared.ResponseMapper(resp, ts.cfg)
 		msg := tgbotapi.NewMessage(*chatID, mappedResp)
 		bot.Send(msg)
 
@@ -108,7 +111,7 @@ func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *
 	var result strings.Builder
 	result.WriteString("Найдены следующие покупатели:\n\n")
 	for _, resp := range respList {
-		result.WriteString(shared.ResponseMapper(&resp) + "\n\n")
+		result.WriteString(shared.ResponseMapper(&resp, ts.cfg) + "\n\n")
 	}
 
 	msg := tgbotapi.NewMessage(*chatID, result.String())
