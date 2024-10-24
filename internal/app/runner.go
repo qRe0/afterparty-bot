@@ -41,7 +41,7 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("app.NewBotAPI(): failed to init telegram bot instance: %v", err)
 	}
-	botInstance.Debug = true
+	//botInstance.Debug = true
 
 	// Layers initialization
 	repository := repo.NewTicketsRepository(db, cfg.DB)
@@ -57,21 +57,19 @@ func Run() error {
 
 	var wg sync.WaitGroup
 	for update := range updates {
-		if update.Message != nil {
-			wg.Add(1)
+		wg.Add(1)
 
-			go func(update tgbotapi.Update) {
-				defer wg.Done()
+		go func(update tgbotapi.Update) {
+			defer wg.Done()
 
-				// Waiting for data
-				ch <- struct{}{}
+			// Waiting for data
+			ch <- struct{}{}
 
-				handler.HandleMessages(update, botInstance)
+			handler.HandleMessages(update, botInstance)
 
-				// Clearing channel
-				<-ch
-			}(update)
-		}
+			// Clearing channel
+			<-ch
+		}(update)
 	}
 
 	wg.Wait()
