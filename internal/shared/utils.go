@@ -19,8 +19,6 @@ func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("Фамилия"),
 			tgbotapi.NewKeyboardButton("Часть фамилии"),
-			tgbotapi.NewKeyboardButton("ID"),
-			tgbotapi.NewKeyboardButton("Проход"),
 		),
 	)
 

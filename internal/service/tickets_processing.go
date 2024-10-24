@@ -42,16 +42,30 @@ func (ts *TicketsService) SearchByFullSurname(ctx context.Context, surname *stri
 	}
 
 	formattedSurname := strings.ToLower(*surname)
-	resp, err := ts.repo.SearchByFullSurname(ctx, formattedSurname)
-	if err != nil || resp == nil {
+
+	countOfSurnames, err := ts.repo.CheckCountOfSurnames(ctx, formattedSurname)
+	if err != nil {
 		msg := tgbotapi.NewMessage(*chatID, "Покупатель с заданной фамилией не найден")
 		bot.Send(msg)
 		return
 	}
 
-	mappedResp := shared.ResponseMapper(resp)
-	msg := tgbotapi.NewMessage(*chatID, mappedResp)
-	bot.Send(msg)
+	if countOfSurnames <= 1 {
+		resp, err := ts.repo.SearchByFullSurname(ctx, formattedSurname)
+		if err != nil || resp == nil {
+			msg := tgbotapi.NewMessage(*chatID, "Покупатель с заданной фамилией не найден")
+			bot.Send(msg)
+			return
+		}
+
+		mappedResp := shared.ResponseMapper(resp)
+		msg := tgbotapi.NewMessage(*chatID, mappedResp)
+		bot.Send(msg)
+		return
+	} else {
+		ts.SearchBySurnamePart(ctx, &formattedSurname, chatID, bot)
+	}
+
 }
 
 func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *string, chatID *int64, bot *tgbotapi.BotAPI) {

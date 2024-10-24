@@ -38,16 +38,6 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		msg := tgbotapi.NewMessage(chatID, "Введите часть фамилии для поиска:")
 		bot.Send(msg)
 
-	case "ID":
-		mh.userStates[chatID] = "id"
-		msg := tgbotapi.NewMessage(chatID, "Введите ID для поиска:")
-		bot.Send(msg)
-
-	case "Проход":
-		mh.userStates[chatID] = "entrance"
-		msg := tgbotapi.NewMessage(chatID, "Введите ID для отметки о входе:")
-		bot.Send(msg)
-
 	default:
 		if update.Message.Text != "" {
 			messageType := mh.userStates[chatID]
@@ -55,12 +45,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				mh.service.SearchByFullSurname(ctx, &update.Message.Text, &chatID, bot)
 			} else if messageType == "partial" {
 				mh.service.SearchBySurnamePart(ctx, &update.Message.Text, &chatID, bot)
-			} else if messageType == "id" {
-				mh.service.SearchByID(ctx, &update.Message.Text, &chatID, bot)
-			} else if messageType == "entrance" {
-				mh.service.MarkAsEntered(ctx, &update.Message.Text, &chatID, bot)
 			}
 		}
-		shared.ShowOptions(chatID, bot)
 	}
 }
