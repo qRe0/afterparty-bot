@@ -27,6 +27,8 @@ const (
 
 	findClientByFullSurname = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE surname=$1"
 	findClientBySurnamePart = "SELECT id, full_name, ticket_type, passed_control_zone  FROM tickets WHERE surname LIKE $1"
+	findClientByID          = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE id=$1"
+	updateQuery             = "UPDATE tickets SET passed_control_zone = true WHERE id = $1 RETURNING id, full_name, ticket_type, passed_control_zone"
 )
 
 func Init(cfg configs.DBConfig) (*sqlx.DB, error) {
@@ -93,4 +95,33 @@ func (tr *TicketsRepo) SearchBySurnamePart(ctx context.Context, surnamePart stri
 	}
 
 	return users, nil
+}
+
+func (tr *TicketsRepo) SearchByID(ctx context.Context, id string) (*models.TicketResponse, error) {
+	var name, ticketType string
+	var userId string
+	var passed bool
+
+	err := tr.db.QueryRowContext(ctx, findClientByID, id).Scan(&userId, &name, &ticketType, &passed)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &models.TicketResponse{
+		Id:                userId,
+		Name:              name,
+		TicketType:        ticketType,
+		PassedControlZone: passed,
+	}
+	return resp, nil
+}
+
+func (tr *TicketsRepo) MarkAsEntered(ctx context.Context, id string) (*models.TicketResponse, error) {
+	var resp models.TicketResponse
+	err := tr.db.QueryRowContext(ctx, updateQuery, id).Scan(&resp.Id, &resp.Name, &resp.TicketType, &resp.PassedControlZone)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 }

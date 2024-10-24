@@ -9,4 +9,6 @@ import (
 type TicketsServiceInterface interface {
 	SearchByFullSurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
 	SearchBySurnamePart(ctx context.Context, surnamePart *string, chatID *int64, bot *tgbotapi.BotAPI)
+	SearchByID(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
+	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
 }
