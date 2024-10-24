@@ -1,6 +1,6 @@
 module github.com/qRe0/afterparty-bot
 
-go 1.23.2
+go 1.23.0
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
