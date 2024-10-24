@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"log"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/qRe0/afterparty-bot/internal/service"
@@ -27,9 +28,21 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 	if update.CallbackQuery != nil {
 		chatID = update.CallbackQuery.Message.Chat.ID
-		userId := update.CallbackQuery.Data
-		mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+		data := update.CallbackQuery.Data
 
+		if strings.HasPrefix(data, "confirm_yes_") {
+			userId := strings.TrimPrefix(data, "confirm_yes_")
+			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+		} else if strings.HasPrefix(data, "confirm_no_") {
+			msg := tgbotapi.NewMessage(chatID, "Операция отменена.")
+			bot.Send(msg)
+		} else {
+			// Handling user selection from the list
+			userId := data
+			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+		}
+
+		// Answer the CallbackQuery
 		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
 		if _, err := bot.Request(callback); err != nil {
 			log.Printf("Ошибка при отправке Callback: %v", err)

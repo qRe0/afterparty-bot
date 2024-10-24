@@ -52,10 +52,22 @@ func (ts *TicketsService) SearchByFullSurname(ctx context.Context, surname *stri
 			bot.Send(msg)
 			return
 		}
-
 		mappedResp := shared.ResponseMapper(resp)
 		msg := tgbotapi.NewMessage(*chatID, mappedResp)
 		bot.Send(msg)
+
+		if resp.PassedControlZone == false {
+			yesButton := tgbotapi.NewInlineKeyboardButtonData("Да", fmt.Sprintf("confirm_yes_%s", resp.Id))
+			noButton := tgbotapi.NewInlineKeyboardButtonData("Нет", fmt.Sprintf("confirm_no_%s", resp.Id))
+			keyboard := tgbotapi.NewInlineKeyboardMarkup(
+				tgbotapi.NewInlineKeyboardRow(yesButton, noButton),
+			)
+			confirmMsg := tgbotapi.NewMessage(*chatID, "Отметить вход?")
+			confirmMsg.ReplyMarkup = keyboard
+			bot.Send(confirmMsg)
+			return
+		}
+
 		return
 	} else {
 		ts.SearchBySurnamePart(ctx, &formattedSurname, chatID, bot)
