@@ -17,8 +17,10 @@ func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
 	msg := tgbotapi.NewMessage(chatID, "Выберите опцию поиска покупателя:")
 	keyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Найти по фамилии"),
-			tgbotapi.NewKeyboardButton("Найти по части фамилии"),
+			tgbotapi.NewKeyboardButton("Фамилия"),
+			tgbotapi.NewKeyboardButton("Часть фамилии"),
+			tgbotapi.NewKeyboardButton("ID"),
+			tgbotapi.NewKeyboardButton("Проход"),
 		),
 	)
 
