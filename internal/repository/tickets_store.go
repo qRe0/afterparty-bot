@@ -56,7 +56,7 @@ func (tr *TicketsRepo) SearchByFullSurname(ctx context.Context, surname string) 
 	var id string
 	var passed bool
 
-	err := tr.db.QueryRow(findClientByFullSurname, surname).Scan(&id, &name, &ticketType, &passed)
+	err := tr.db.QueryRowContext(ctx, findClientByFullSurname, surname).Scan(&id, &name, &ticketType, &passed)
 	if err != nil {
 		return nil, err
 	}
