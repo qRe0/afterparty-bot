@@ -97,25 +97,6 @@ func (tr *TicketsRepo) SearchBySurnamePart(ctx context.Context, surnamePart stri
 	return users, nil
 }
 
-func (tr *TicketsRepo) SearchByID(ctx context.Context, id string) (*models.TicketResponse, error) {
-	var name, ticketType string
-	var userId string
-	var passed bool
-
-	err := tr.db.QueryRowContext(ctx, findClientByID, id).Scan(&userId, &name, &ticketType, &passed)
-	if err != nil {
-		return nil, err
-	}
-
-	resp := &models.TicketResponse{
-		Id:                userId,
-		Name:              name,
-		TicketType:        ticketType,
-		PassedControlZone: passed,
-	}
-	return resp, nil
-}
-
 func (tr *TicketsRepo) MarkAsEntered(ctx context.Context, id string) (*models.TicketResponse, error) {
 	var resp models.TicketResponse
 	err := tr.db.QueryRowContext(ctx, updateQuery, id).Scan(&resp.Id, &resp.Name, &resp.TicketType, &resp.PassedControlZone)

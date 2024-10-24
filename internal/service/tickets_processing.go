@@ -103,35 +103,6 @@ func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *
 	bot.Send(msg)
 }
 
-func (ts *TicketsService) SearchByID(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) {
-	if userId == nil || *userId == "" {
-		msg := tgbotapi.NewMessage(*chatID, "service.SearchByID: Предоставлен пустой ID")
-		bot.Send(msg)
-		return
-	}
-
-	if chatID == nil {
-		msg := tgbotapi.NewMessage(-1, "service.SearchByID: Предоставлен пустой ID чата")
-		bot.Send(msg)
-		return
-	}
-
-	if bot == nil {
-		log.Fatalln("service.SearchByID: Пустой инстанс бота")
-	}
-
-	resp, err := ts.repo.SearchByID(ctx, *userId)
-	if err != nil || resp == nil {
-		msg := tgbotapi.NewMessage(*chatID, "Покупатель с данным ID не найден")
-		bot.Send(msg)
-		return
-	}
-
-	mappedResp := shared.ResponseMapper(resp)
-	msg := tgbotapi.NewMessage(*chatID, mappedResp)
-	bot.Send(msg)
-}
-
 func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) {
 	if userId == nil || *userId == "" {
 		msg := tgbotapi.NewMessage(*chatID, "service.SearchByID: Предоставлен пустой ID")
