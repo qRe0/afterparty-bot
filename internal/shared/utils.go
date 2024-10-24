@@ -4,13 +4,8 @@ import (
 	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/qRe0/afterparty-bot/internal/configs"
 	"github.com/qRe0/afterparty-bot/internal/models"
-)
-
-const (
-	OrgLace     = "КРАСНЫЙ"
-	VipLace     = "СИНИЙ"
-	DefaultLace = "ЖЕЛТЫЙ"
 )
 
 func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
@@ -26,18 +21,18 @@ func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
 	bot.Send(msg)
 }
 
-func ResponseMapper(resp *models.TicketResponse) string {
+func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string {
 	successEmoji := "✅"
 	failEmoji := "❌"
 
 	var laceColor string
 	switch resp.TicketType {
 	case "ОРГ":
-		laceColor = OrgLace
+		laceColor = cfg.Org
 	case "ВИП":
-		laceColor = VipLace
+		laceColor = cfg.VIP
 	case "БАЗОВЫЙ":
-		laceColor = DefaultLace
+		laceColor = cfg.Base
 	default:
 		return "Неизвестный тип билета"
 	}

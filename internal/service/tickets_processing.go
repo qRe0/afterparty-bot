@@ -2,27 +2,25 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/qRe0/afterparty-bot/internal/configs"
 	"github.com/qRe0/afterparty-bot/internal/repository"
 	"github.com/qRe0/afterparty-bot/internal/shared"
 )
 
-const (
-	OrgLace     = "Красный"
-	VipLace     = "Синий"
-	DefaultLace = "Желтый"
-)
-
 type TicketsService struct {
 	repo *repository.TicketsRepo
+	cfg  configs.LacesColors
 }
 
-func NewTicketsService(repo *repository.TicketsRepo) *TicketsService {
+func NewTicketsService(repo *repository.TicketsRepo, cfg configs.LacesColors) *TicketsService {
 	return &TicketsService{
 		repo: repo,
+		cfg:  cfg,
 	}
 }
 
@@ -57,15 +55,26 @@ func (ts *TicketsService) SearchByFullSurname(ctx context.Context, surname *stri
 			bot.Send(msg)
 			return
 		}
-
-		mappedResp := shared.ResponseMapper(resp)
+		mappedResp := shared.ResponseMapper(resp, ts.cfg)
 		msg := tgbotapi.NewMessage(*chatID, mappedResp)
 		bot.Send(msg)
+
+		if resp.PassedControlZone == false {
+			yesButton := tgbotapi.NewInlineKeyboardButtonData("Да", fmt.Sprintf("confirm_yes_%s", resp.Id))
+			noButton := tgbotapi.NewInlineKeyboardButtonData("Нет", fmt.Sprintf("confirm_no_%s", resp.Id))
+			keyboard := tgbotapi.NewInlineKeyboardMarkup(
+				tgbotapi.NewInlineKeyboardRow(yesButton, noButton),
+			)
+			confirmMsg := tgbotapi.NewMessage(*chatID, "Отметить вход?")
+			confirmMsg.ReplyMarkup = keyboard
+			bot.Send(confirmMsg)
+			return
+		}
+
 		return
 	} else {
 		ts.SearchBySurnamePart(ctx, &formattedSurname, chatID, bot)
 	}
-
 }
 
 func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *string, chatID *int64, bot *tgbotapi.BotAPI) {
@@ -87,8 +96,14 @@ func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *
 
 	formattedSurname := strings.ToLower(*surnamePart)
 	respList, err := ts.repo.SearchBySurnamePart(ctx, formattedSurname)
-	if err != nil || len(respList) == 0 {
-		msg := tgbotapi.NewMessage(*chatID, "Покупателей с такими фамилиями не найдено.")
+	if err != nil {
+		msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
+		bot.Send(msg)
+		return
+	}
+
+	if len(respList) == 0 {
+		msg := tgbotapi.NewMessage(*chatID, "Нет покупателей с указанной фамилией, которые еще не прошли контроль")
 		bot.Send(msg)
 		return
 	}
@@ -96,67 +111,49 @@ func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *
 	var result strings.Builder
 	result.WriteString("Найдены следующие покупатели:\n\n")
 	for _, resp := range respList {
-		result.WriteString(shared.ResponseMapper(&resp) + "\n\n")
+		result.WriteString(shared.ResponseMapper(&resp, ts.cfg) + "\n\n")
 	}
 
 	msg := tgbotapi.NewMessage(*chatID, result.String())
 	bot.Send(msg)
-}
 
-func (ts *TicketsService) SearchByID(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) {
-	if userId == nil || *userId == "" {
-		msg := tgbotapi.NewMessage(*chatID, "service.SearchByID: Предоставлен пустой ID")
-		bot.Send(msg)
-		return
+	var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
+	for _, resp := range respList {
+		if resp.PassedControlZone == false {
+			btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
+			inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
+		}
 	}
-
-	if chatID == nil {
-		msg := tgbotapi.NewMessage(-1, "service.SearchByID: Предоставлен пустой ID чата")
-		bot.Send(msg)
-		return
-	}
-
-	if bot == nil {
-		log.Fatalln("service.SearchByID: Пустой инстанс бота")
-	}
-
-	resp, err := ts.repo.SearchByID(ctx, *userId)
-	if err != nil || resp == nil {
-		msg := tgbotapi.NewMessage(*chatID, "Покупатель с данным ID не найден")
-		bot.Send(msg)
-		return
-	}
-
-	mappedResp := shared.ResponseMapper(resp)
-	msg := tgbotapi.NewMessage(*chatID, mappedResp)
+	msg = tgbotapi.NewMessage(*chatID, "Выберите нужного покупателя, чтобы отметить вход:")
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
 	bot.Send(msg)
 }
 
 func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) {
 	if userId == nil || *userId == "" {
-		msg := tgbotapi.NewMessage(*chatID, "service.SearchByID: Предоставлен пустой ID")
+		msg := tgbotapi.NewMessage(*chatID, "service.MarkAsEntered: Предоставлен пустой ID")
 		bot.Send(msg)
 		return
 	}
 
 	if chatID == nil {
-		msg := tgbotapi.NewMessage(-1, "service.SearchByID: Предоставлен пустой ID чата")
+		msg := tgbotapi.NewMessage(-1, "service.MarkAsEntered: Предоставлен пустой ID чата")
 		bot.Send(msg)
 		return
 	}
 
 	if bot == nil {
-		log.Fatalln("service.SearchByID: Пустой инстанс бота")
+		log.Fatalln("service.MarkAsEntered: Пустой инстанс бота")
 	}
 
 	resp, err := ts.repo.MarkAsEntered(ctx, *userId)
 	if err != nil || resp == nil {
-		msg := tgbotapi.NewMessage(*chatID, "Покупатель с данным ID не найден")
+		msg := tgbotapi.NewMessage(*chatID, "service.MarkAsEntered: Покупатель с данным ID не найден")
 		bot.Send(msg)
 		return
 	}
 
-	mappedResp := shared.ResponseMapper(resp)
+	mappedResp := fmt.Sprintf("%s прошел контроль (ID: %s)", resp.Name, resp.Id)
 	msg := tgbotapi.NewMessage(*chatID, mappedResp)
 	bot.Send(msg)
 }

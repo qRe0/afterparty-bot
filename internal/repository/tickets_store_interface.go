@@ -9,7 +9,6 @@ import (
 type TicketsRepoInterface interface {
 	SearchByFullSurname(ctx context.Context, surname string) (*models.TicketResponse, error)
 	SearchBySurnamePart(ctx context.Context, surnamePart string) ([]models.TicketResponse, error)
-	SearchByID(ctx context.Context, id string) (*models.TicketResponse, error)
 	MarkAsEntered(ctx context.Context, id string) (*models.TicketResponse, error)
 	CheckCountOfSurnames(ctx context.Context, surname string) (int64, error)
 }
