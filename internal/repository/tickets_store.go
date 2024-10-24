@@ -125,3 +125,17 @@ func (tr *TicketsRepo) MarkAsEntered(ctx context.Context, id string) (*models.Ti
 
 	return &resp, nil
 }
+
+func (tr *TicketsRepo) CheckCountOfSurnames(ctx context.Context, surname string) (int64, error) {
+	res, err := tr.db.ExecContext(ctx, findClientByFullSurname, surname)
+	if err != nil {
+		return 0, err
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return affected, nil
+}
