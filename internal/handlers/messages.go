@@ -37,12 +37,10 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			msg := tgbotapi.NewMessage(chatID, "Операция отменена.")
 			bot.Send(msg)
 		} else {
-			// Handling user selection from the list
 			userId := data
 			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
 		}
 
-		// Answer the CallbackQuery
 		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
 		if _, err := bot.Request(callback); err != nil {
 			log.Printf("Ошибка при отправке Callback: %v", err)
