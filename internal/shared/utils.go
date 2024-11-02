@@ -42,6 +42,6 @@ func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string
 		controlStatus = successEmoji
 	}
 
-	return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s\nПрошел контроль: %s",
+	return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s,\nПрошел контроль: %s",
 		resp.Id, resp.Name, resp.TicketType, laceColor, controlStatus)
 }
