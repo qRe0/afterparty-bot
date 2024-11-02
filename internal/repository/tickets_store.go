@@ -27,7 +27,6 @@ const (
 
 	findClientByFullSurname = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE surname=$1"
 	findClientBySurnamePart = "SELECT id, full_name, ticket_type, passed_control_zone  FROM tickets WHERE surname LIKE $1"
-	findClientByID          = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE id=$1"
 	updateQuery             = "UPDATE tickets SET passed_control_zone = true WHERE id = $1 RETURNING id, full_name, ticket_type, passed_control_zone"
 )
 
@@ -98,8 +97,19 @@ func (tr *TicketsRepo) SearchBySurnamePart(ctx context.Context, surnamePart stri
 }
 
 func (tr *TicketsRepo) MarkAsEntered(ctx context.Context, id string) (*models.TicketResponse, error) {
+	tx, err := tr.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	var resp models.TicketResponse
-	err := tr.db.QueryRowContext(ctx, updateQuery, id).Scan(&resp.Id, &resp.Name, &resp.TicketType, &resp.PassedControlZone)
+	err = tx.QueryRowContext(ctx, updateQuery, id).Scan(&resp.Id, &resp.Name, &resp.TicketType, &resp.PassedControlZone)
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err = tx.Commit()
 	if err != nil {
 		return nil, err
 	}
