@@ -23,13 +23,13 @@ func Run() error {
 		return fmt.Errorf("app.NewDatabaseConnection(): failed to init database: %v", err)
 	}
 
-	migrator, err := migrations.NewMigrator(db)
+	m, err := migrator.New(db)
 	if err != nil {
-		return fmt.Errorf("app.NewMigrator(): failed to init database migrtor: %v", err)
+		return fmt.Errorf("app.migrator.New(): failed to init database migrtor: %v", err)
 	}
-	err = migrator.Latest()
+	err = m.Latest()
 	if err != nil {
-		return fmt.Errorf("app.migrator.Latest(): failed to migrate database to latest version: %v", err)
+		return fmt.Errorf("app.m.Latest(): failed to migrate database to latest version: %v", err)
 	}
 
 	botInstance, err := tgbotapi.NewBotAPI(cfg.TG.Token)
