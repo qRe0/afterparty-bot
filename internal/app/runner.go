@@ -18,9 +18,9 @@ func Run() error {
 		return fmt.Errorf("app.LoadEnv(): failed to load env vars: %v", err)
 	}
 
-	db, err := repo.Init(cfg.DB)
+	db, err := repo.NewDatabaseConnection(cfg.DB)
 	if err != nil {
-		return fmt.Errorf("app.Init(): failed to init database: %v", err)
+		return fmt.Errorf("app.NewDatabaseConnection(): failed to init database: %v", err)
 	}
 
 	migrator, err := migrations.NewMigrator(db)
