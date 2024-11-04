@@ -1,4 +1,4 @@
-package service
+package ticket_service
 
 import (
 	"context"
@@ -13,11 +13,11 @@ import (
 )
 
 type TicketsService struct {
-	repo *repository.TicketsRepo
+	repo *ticket_repository.TicketsRepo
 	cfg  configs.LacesColors
 }
 
-func NewTicketsService(repo *repository.TicketsRepo, cfg configs.LacesColors) *TicketsService {
+func New(repo *ticket_repository.TicketsRepo, cfg configs.LacesColors) *TicketsService {
 	return &TicketsService{
 		repo: repo,
 		cfg:  cfg,

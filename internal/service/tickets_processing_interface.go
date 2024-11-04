@@ -1,4 +1,4 @@
-package service
+package ticket_service
 
 import (
 	"context"

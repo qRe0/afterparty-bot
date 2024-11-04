@@ -1,4 +1,4 @@
-package repository
+package ticket_repository
 
 import (
 	"context"
@@ -15,7 +15,7 @@ type TicketsRepo struct {
 	cfg configs.DBConfig
 }
 
-func NewTicketsRepository(db *sqlx.DB, cfg configs.DBConfig) *TicketsRepo {
+func New(db *sqlx.DB, cfg configs.DBConfig) *TicketsRepo {
 	return &TicketsRepo{
 		cfg: cfg,
 		db:  db,
