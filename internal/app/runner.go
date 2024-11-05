@@ -8,8 +8,8 @@ import (
 	"github.com/qRe0/afterparty-bot/internal/configs"
 	"github.com/qRe0/afterparty-bot/internal/handlers"
 	"github.com/qRe0/afterparty-bot/internal/migrations"
-	repo "github.com/qRe0/afterparty-bot/internal/repository"
-	serv "github.com/qRe0/afterparty-bot/internal/service"
+	"github.com/qRe0/afterparty-bot/internal/repository"
+	"github.com/qRe0/afterparty-bot/internal/service"
 )
 
 func Run() error {
@@ -18,18 +18,18 @@ func Run() error {
 		return fmt.Errorf("app.LoadEnv(): failed to load env vars: %v", err)
 	}
 
-	db, err := repo.Init(cfg.DB)
+	db, err := ticket_repository.NewDatabaseConnection(cfg.DB)
 	if err != nil {
-		return fmt.Errorf("app.Init(): failed to init database: %v", err)
+		return fmt.Errorf("app.NewDatabaseConnection(): failed to init database: %v", err)
 	}
 
-	migrator, err := migrations.NewMigrator(db)
+	m, err := migrator.New(db)
 	if err != nil {
-		return fmt.Errorf("app.NewMigrator(): failed to init database migrtor: %v", err)
+		return fmt.Errorf("app.migrator.New(): failed to init database migrtor: %v", err)
 	}
-	err = migrator.Latest()
+	err = m.Latest()
 	if err != nil {
-		return fmt.Errorf("app.migrator.Latest(): failed to migrate database to latest version: %v", err)
+		return fmt.Errorf("app.m.Latest(): failed to migrate database to latest version: %v", err)
 	}
 
 	botInstance, err := tgbotapi.NewBotAPI(cfg.TG.Token)
@@ -37,9 +37,9 @@ func Run() error {
 		return fmt.Errorf("app.NewBotAPI(): failed to init telegram bot instance: %v", err)
 	}
 
-	repository := repo.NewTicketsRepository(db, cfg.DB)
-	service := serv.NewTicketsService(repository, cfg.LacesColor)
-	handler := handlers.NewMessagesHandler(service)
+	repository := ticket_repository.New(db, cfg.DB)
+	service := ticket_service.New(repository, cfg.LacesColor)
+	handler := handlers.New(service)
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 300

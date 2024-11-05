@@ -1,4 +1,4 @@
-package repository
+package ticket_repository
 
 import (
 	"context"
@@ -15,7 +15,7 @@ type TicketsRepo struct {
 	cfg configs.DBConfig
 }
 
-func NewTicketsRepository(db *sqlx.DB, cfg configs.DBConfig) *TicketsRepo {
+func New(db *sqlx.DB, cfg configs.DBConfig) *TicketsRepo {
 	return &TicketsRepo{
 		cfg: cfg,
 		db:  db,
@@ -30,17 +30,17 @@ const (
 	updateQuery             = "UPDATE tickets SET passed_control_zone = true WHERE id = $1 RETURNING id, full_name, ticket_type, passed_control_zone"
 )
 
-func Init(cfg configs.DBConfig) (*sqlx.DB, error) {
+func NewDatabaseConnection(cfg configs.DBConfig) (*sqlx.DB, error) {
 	connStr := fmt.Sprintf(connectingStringTemplate, cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DBName)
 
 	db, err := sqlx.Open("postgres", connStr)
 	if err != nil {
-		return nil, fmt.Errorf("repository.Init().Open(): failed to conncect to database: %w", err)
+		return nil, fmt.Errorf("repository.NewDatabaseConnection().Open(): failed to conncect to database: %w", err)
 	}
 
 	err = db.Ping()
 	if err != nil {
-		return nil, fmt.Errorf("repository.Init().Ping(): failed to ping database: %w", err)
+		return nil, fmt.Errorf("repository.NewDatabaseConnection().Ping(): failed to ping database: %w", err)
 	}
 
 	db.SetMaxOpenConns(5)

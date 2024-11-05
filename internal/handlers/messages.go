@@ -11,11 +11,11 @@ import (
 )
 
 type MessagesHandler struct {
-	service    *service.TicketsService
+	service    *ticket_service.TicketsService
 	userStates map[int64]string
 }
 
-func NewMessagesHandler(service *service.TicketsService) MessagesHandler {
+func New(service *ticket_service.TicketsService) MessagesHandler {
 	return MessagesHandler{
 		service:    service,
 		userStates: make(map[int64]string),

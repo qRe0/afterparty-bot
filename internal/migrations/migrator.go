@@ -1,4 +1,4 @@
-package migrations
+package migrator
 
 import (
 	"embed"
@@ -31,7 +31,7 @@ type Migrator interface {
 	Latest() error
 }
 
-func NewMigrator(db *sqlx.DB) (Migrator, error) {
+func New(db *sqlx.DB) (Migrator, error) {
 	goose.SetBaseFS(embedMigrations)
 
 	err := goose.SetDialect("postgres")
