@@ -14,8 +14,7 @@ import (
 )
 
 type TicketsRepoInterface interface {
-	SearchByFullSurname(ctx context.Context, surname string) (*models.TicketResponse, error)
-	SearchBySurnamePart(ctx context.Context, surnamePart string) ([]models.TicketResponse, error)
+	SearchBySurname(ctx context.Context, surname string) ([]models.TicketResponse, error)
 	MarkAsEntered(ctx context.Context, id string) (*models.TicketResponse, error)
 	CheckCountOfSurnames(ctx context.Context, surname string) (int64, error)
 }
@@ -32,61 +31,8 @@ func New(repo *ticket_repository.TicketsRepo, cfg configs.LacesColors) *TicketsS
 	}
 }
 
-func (ts *TicketsService) SearchByFullSurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI) {
+func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI) {
 	if surname == nil || *surname == "" {
-		msg := tgbotapi.NewMessage(-1, "service.SearchByFullSurname: Предоставлена пустая фамилия")
-		bot.Send(msg)
-		return
-	}
-	if chatID == nil {
-		msg := tgbotapi.NewMessage(-1, "service.SearchByFullSurname: Предоставлен пустой ID чата")
-		bot.Send(msg)
-		return
-	}
-	if bot == nil {
-		log.Fatalln("service.SearchByFullSurname: Пустой инстанс бота")
-	}
-
-	formattedSurname := strings.ToLower(*surname)
-
-	countOfSurnames, err := ts.repo.CheckCountOfSurnames(ctx, formattedSurname)
-	if err != nil {
-		msg := tgbotapi.NewMessage(*chatID, "Покупатель с заданной фамилией не найден")
-		bot.Send(msg)
-		return
-	}
-
-	if countOfSurnames <= 1 {
-		resp, err := ts.repo.SearchByFullSurname(ctx, formattedSurname)
-		if err != nil || resp == nil {
-			msg := tgbotapi.NewMessage(*chatID, "Покупатель с заданной фамилией не найден")
-			bot.Send(msg)
-			return
-		}
-		mappedResp := shared.ResponseMapper(resp, ts.cfg)
-		msg := tgbotapi.NewMessage(*chatID, mappedResp)
-		bot.Send(msg)
-
-		if resp.PassedControlZone == false {
-			yesButton := tgbotapi.NewInlineKeyboardButtonData("Да", fmt.Sprintf("confirm_yes_%s", resp.Id))
-			noButton := tgbotapi.NewInlineKeyboardButtonData("Нет", fmt.Sprintf("confirm_no_%s", resp.Id))
-			keyboard := tgbotapi.NewInlineKeyboardMarkup(
-				tgbotapi.NewInlineKeyboardRow(yesButton, noButton),
-			)
-			confirmMsg := tgbotapi.NewMessage(*chatID, "Отметить вход?")
-			confirmMsg.ReplyMarkup = keyboard
-			bot.Send(confirmMsg)
-			return
-		}
-
-		return
-	} else {
-		ts.SearchBySurnamePart(ctx, &formattedSurname, chatID, bot)
-	}
-}
-
-func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *string, chatID *int64, bot *tgbotapi.BotAPI) {
-	if surnamePart == nil || *surnamePart == "" {
 		msg := tgbotapi.NewMessage(*chatID, "service.SearchBySurnamePart: Предоставлена пустая фамилия")
 		bot.Send(msg)
 		return
@@ -102,8 +48,8 @@ func (ts *TicketsService) SearchBySurnamePart(ctx context.Context, surnamePart *
 		log.Fatalln("service.SearchBySurnamePart: Пустой инстанс бота")
 	}
 
-	formattedSurname := strings.ToLower(*surnamePart)
-	respList, err := ts.repo.SearchBySurnamePart(ctx, formattedSurname)
+	formattedSurname := strings.ToLower(*surname)
+	respList, err := ts.repo.SearchBySurname(ctx, formattedSurname)
 	if err != nil {
 		msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
 		bot.Send(msg)
