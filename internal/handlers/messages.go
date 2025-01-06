@@ -11,8 +11,7 @@ import (
 )
 
 type TicketsServiceInterface interface {
-	SearchByFullSurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
-	SearchBySurnamePart(ctx context.Context, surnamePart *string, chatID *int64, bot *tgbotapi.BotAPI)
+	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
 	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
 }
 
@@ -62,23 +61,12 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			shared.ShowOptions(chatID, bot)
 
 		case "Фамилия":
-			mh.userStates[chatID] = "full"
-			msg := tgbotapi.NewMessage(chatID, "Введите фамилию для поиска:")
-			bot.Send(msg)
-
-		case "Часть фамилии":
-			mh.userStates[chatID] = "partial"
-			msg := tgbotapi.NewMessage(chatID, "Введите часть фамилии для поиска:")
+			msg := tgbotapi.NewMessage(chatID, "Введите фамилию или часть фамилии для поиска в списках:")
 			bot.Send(msg)
 
 		default:
 			if update.Message.Text != "" {
-				messageType := mh.userStates[chatID]
-				if messageType == "full" {
-					mh.service.SearchByFullSurname(ctx, &update.Message.Text, &chatID, bot)
-				} else if messageType == "partial" {
-					mh.service.SearchBySurnamePart(ctx, &update.Message.Text, &chatID, bot)
-				}
+				mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
 			}
 		}
 	}
