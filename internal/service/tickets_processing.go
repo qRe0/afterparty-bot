@@ -8,9 +8,17 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/qRe0/afterparty-bot/internal/configs"
+	"github.com/qRe0/afterparty-bot/internal/models"
 	"github.com/qRe0/afterparty-bot/internal/repository"
 	"github.com/qRe0/afterparty-bot/internal/shared"
 )
+
+type TicketsRepoInterface interface {
+	SearchByFullSurname(ctx context.Context, surname string) (*models.TicketResponse, error)
+	SearchBySurnamePart(ctx context.Context, surnamePart string) ([]models.TicketResponse, error)
+	MarkAsEntered(ctx context.Context, id string) (*models.TicketResponse, error)
+	CheckCountOfSurnames(ctx context.Context, surname string) (int64, error)
+}
 
 type TicketsService struct {
 	repo *ticket_repository.TicketsRepo
