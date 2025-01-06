@@ -34,7 +34,7 @@ type Config struct {
 	LacesColor LacesColors
 }
 
-func LoadEnv() (*Config, error) {
+func LoadEnvs() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
 		return nil, ErrLoadEnvVars
