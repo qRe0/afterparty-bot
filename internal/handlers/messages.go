@@ -40,7 +40,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
 		} else if strings.HasPrefix(data, "confirm_no_") {
 			msg := tgbotapi.NewMessage(chatID, "Операция отменена.")
-			bot.Send(msg)
+			_, _ = bot.Send(msg)
 		} else {
 			userId := data
 			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
@@ -62,7 +62,11 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		case "Фамилия":
 			msg := tgbotapi.NewMessage(chatID, "Введите фамилию или часть фамилии для поиска в списках:")
-			bot.Send(msg)
+			_, _ = bot.Send(msg)
+
+		case "Номер билета (ID)":
+			msg := tgbotapi.NewMessage(chatID, "Введите номер билета (ID):")
+			_, _ = bot.Send(msg)
 
 		default:
 			if update.Message.Text != "" {
