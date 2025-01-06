@@ -13,7 +13,7 @@ import (
 )
 
 func Run() error {
-	cfg, err := configs.LoadEnv()
+	cfg, err := configs.LoadEnvs()
 	if err != nil {
 		return fmt.Errorf("app.LoadEnv(): failed to load env vars: %v", err)
 	}
