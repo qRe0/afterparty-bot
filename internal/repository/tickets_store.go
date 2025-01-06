@@ -28,6 +28,7 @@ const (
 	findClientByFullSurname = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE surname=$1"
 	findClientBySurname     = "SELECT id, full_name, ticket_type, passed_control_zone  FROM tickets WHERE surname LIKE $1"
 	updateQuery             = "UPDATE tickets SET passed_control_zone = true WHERE id = $1 RETURNING id, full_name, ticket_type, passed_control_zone"
+	searchById              = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE id=$1"
 )
 
 func NewDatabaseConnection(cfg configs.DBConfig) (*sqlx.DB, error) {
@@ -109,4 +110,14 @@ func (tr *TicketsRepo) CheckCountOfSurnames(ctx context.Context, surname string)
 	}
 
 	return affected, nil
+}
+
+func (tr *TicketsRepo) SearchById(ctx context.Context, id string) (*models.TicketResponse, error) {
+	var resp models.TicketResponse
+	err := tr.db.QueryRowContext(ctx, searchById, id).Scan(&resp.Id, &resp.Name, &resp.TicketType, &resp.PassedControlZone)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 }

@@ -17,6 +17,7 @@ type TicketsRepoInterface interface {
 	SearchBySurname(ctx context.Context, surname string) ([]models.TicketResponse, error)
 	MarkAsEntered(ctx context.Context, id string) (*models.TicketResponse, error)
 	CheckCountOfSurnames(ctx context.Context, surname string) (int64, error)
+	SearchById(ctx context.Context, id string) (*models.TicketResponse, error)
 }
 
 type TicketsService struct {
@@ -49,16 +50,16 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 	}
 
 	formattedSurname := strings.ToLower(*surname)
-	fullSurnameToSearch := formattedSurname
-	respList, err := ts.repo.SearchBySurname(ctx, fullSurnameToSearch)
+	partSurnameToSearch := formattedSurname + "%"
+	respList, err := ts.repo.SearchBySurname(ctx, partSurnameToSearch)
 	if err != nil {
 		msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
 		_, _ = bot.Send(msg)
 		return
 	}
 	if len(respList) == 0 {
-		partSurnameToSearch := formattedSurname + "%"
-		newRespList, err := ts.repo.SearchBySurname(ctx, partSurnameToSearch)
+		fullSurnameToSearch := formattedSurname
+		newRespList, err := ts.repo.SearchBySurname(ctx, fullSurnameToSearch)
 		if err != nil {
 			msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
 			_, _ = bot.Send(msg)
@@ -86,6 +87,47 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 			btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
 			inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
 		}
+	}
+	msg = tgbotapi.NewMessage(*chatID, "Выберите нужного покупателя, чтобы отметить вход:")
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
+	_, _ = bot.Send(msg)
+}
+
+func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) {
+	if userId == nil || *userId == "" {
+		msg := tgbotapi.NewMessage(*chatID, "service.SearchBySurnamePart: Предоставлен пустой номер билета (ID покупателя)")
+		_, _ = bot.Send(msg)
+		return
+	}
+
+	if chatID == nil {
+		msg := tgbotapi.NewMessage(-1, "service.SearchBySurnamePart: Предоставлен пустой ID чата")
+		_, _ = bot.Send(msg)
+		return
+	}
+
+	if bot == nil {
+		log.Fatalln("service.SearchBySurnamePart: Пустой инстанс бота")
+	}
+
+	resp, err := ts.repo.SearchById(ctx, *userId)
+	if err != nil {
+		msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
+		_, _ = bot.Send(msg)
+		return
+	}
+
+	var result strings.Builder
+	result.WriteString("Найдены следующие покупатели:\n\n")
+	result.WriteString(shared.ResponseMapper(resp, ts.cfg) + "\n\n")
+
+	msg := tgbotapi.NewMessage(*chatID, result.String())
+	_, _ = bot.Send(msg)
+
+	var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
+	if resp.PassedControlZone == false {
+		btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
+		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
 	}
 	msg = tgbotapi.NewMessage(*chatID, "Выберите нужного покупателя, чтобы отметить вход:")
 	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)

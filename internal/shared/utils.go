@@ -13,7 +13,7 @@ func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
 	keyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("Фамилия"),
-			tgbotapi.NewKeyboardButton("ID - UNIMPLEMENTED"),
+			tgbotapi.NewKeyboardButton("Номер билета (ID)"),
 		),
 	)
 
