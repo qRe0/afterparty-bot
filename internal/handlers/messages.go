@@ -12,6 +12,7 @@ import (
 
 type TicketsServiceInterface interface {
 	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
+	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
 	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
 }
 
@@ -40,7 +41,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
 		} else if strings.HasPrefix(data, "confirm_no_") {
 			msg := tgbotapi.NewMessage(chatID, "Операция отменена.")
-			bot.Send(msg)
+			_, _ = bot.Send(msg)
 		} else {
 			userId := data
 			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
@@ -62,11 +63,21 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		case "Фамилия":
 			msg := tgbotapi.NewMessage(chatID, "Введите фамилию или часть фамилии для поиска в списках:")
-			bot.Send(msg)
+			_, _ = bot.Send(msg)
+			mh.userStates[chatID] = "awaiting_surname"
+
+		case "Номер билета (ID)":
+			msg := tgbotapi.NewMessage(chatID, "Введите номер билета (ID):")
+			_, _ = bot.Send(msg)
+			mh.userStates[chatID] = "awaiting_ticket_id"
 
 		default:
 			if update.Message.Text != "" {
-				mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
+				if mh.userStates[chatID] == "awaiting_ticket_id" {
+					mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
+				} else if mh.userStates[chatID] == "awaiting_surname" {
+					mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
+				}
 			}
 		}
 	}
