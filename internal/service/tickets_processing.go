@@ -49,17 +49,26 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 	}
 
 	formattedSurname := strings.ToLower(*surname)
-	respList, err := ts.repo.SearchBySurname(ctx, formattedSurname)
+	fullSurnameToSearch := formattedSurname
+	respList, err := ts.repo.SearchBySurname(ctx, fullSurnameToSearch)
 	if err != nil {
 		msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
 		bot.Send(msg)
 		return
 	}
-
 	if len(respList) == 0 {
-		msg := tgbotapi.NewMessage(*chatID, "Нет покупателей с указанной фамилией, которые еще не прошли контроль")
-		bot.Send(msg)
-		return
+		partSurnameToSearch := formattedSurname + "%"
+		newRespList, err := ts.repo.SearchBySurname(ctx, partSurnameToSearch)
+		if err != nil {
+			msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
+			bot.Send(msg)
+			return
+		}
+		if len(newRespList) == 0 {
+			msg := tgbotapi.NewMessage(*chatID, "Нет покупателей с указанной фамилией")
+			bot.Send(msg)
+			return
+		}
 	}
 
 	var result strings.Builder

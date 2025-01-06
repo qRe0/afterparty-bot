@@ -53,8 +53,7 @@ func NewDatabaseConnection(cfg configs.DBConfig) (*sqlx.DB, error) {
 }
 
 func (tr *TicketsRepo) SearchBySurname(ctx context.Context, surname string) ([]models.TicketResponse, error) {
-	surnamePattern := surname + "%"
-	rows, err := tr.db.QueryContext(ctx, findClientBySurname, surnamePattern)
+	rows, err := tr.db.QueryContext(ctx, findClientBySurname, surname)
 	if err != nil {
 		return nil, err
 	}
