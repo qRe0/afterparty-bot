@@ -26,8 +26,9 @@ const (
 	connectingStringTemplate = "postgres://%s:%s@%s:%s/%s?sslmode=disable"
 
 	findClientByFullSurname = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE surname=$1"
-	findClientBySurnamePart = "SELECT id, full_name, ticket_type, passed_control_zone  FROM tickets WHERE surname LIKE $1"
+	findClientBySurname     = "SELECT id, full_name, ticket_type, passed_control_zone  FROM tickets WHERE surname LIKE $1"
 	updateQuery             = "UPDATE tickets SET passed_control_zone = true WHERE id = $1 RETURNING id, full_name, ticket_type, passed_control_zone"
+	searchById              = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE id=$1"
 )
 
 func NewDatabaseConnection(cfg configs.DBConfig) (*sqlx.DB, error) {
@@ -52,28 +53,8 @@ func NewDatabaseConnection(cfg configs.DBConfig) (*sqlx.DB, error) {
 	return db, nil
 }
 
-func (tr *TicketsRepo) SearchByFullSurname(ctx context.Context, surname string) (*models.TicketResponse, error) {
-	var name, ticketType string
-	var id string
-	var passed bool
-
-	err := tr.db.QueryRowContext(ctx, findClientByFullSurname, surname).Scan(&id, &name, &ticketType, &passed)
-	if err != nil {
-		return nil, err
-	}
-
-	resp := &models.TicketResponse{
-		Id:                id,
-		Name:              name,
-		TicketType:        ticketType,
-		PassedControlZone: passed,
-	}
-	return resp, nil
-}
-
-func (tr *TicketsRepo) SearchBySurnamePart(ctx context.Context, surnamePart string) ([]models.TicketResponse, error) {
-	surnamePattern := surnamePart + "%"
-	rows, err := tr.db.QueryContext(ctx, findClientBySurnamePart, surnamePattern)
+func (tr *TicketsRepo) SearchBySurname(ctx context.Context, surname string) ([]models.TicketResponse, error) {
+	rows, err := tr.db.QueryContext(ctx, findClientBySurname, surname)
 	if err != nil {
 		return nil, err
 	}
@@ -129,4 +110,14 @@ func (tr *TicketsRepo) CheckCountOfSurnames(ctx context.Context, surname string)
 	}
 
 	return affected, nil
+}
+
+func (tr *TicketsRepo) SearchById(ctx context.Context, id string) (*models.TicketResponse, error) {
+	var resp models.TicketResponse
+	err := tr.db.QueryRowContext(ctx, searchById, id).Scan(&resp.Id, &resp.Name, &resp.TicketType, &resp.PassedControlZone)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 }

@@ -13,12 +13,12 @@ func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
 	keyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("Фамилия"),
-			tgbotapi.NewKeyboardButton("Часть фамилии"),
+			tgbotapi.NewKeyboardButton("Номер билета (ID)"),
 		),
 	)
 
 	msg.ReplyMarkup = keyboard
-	bot.Send(msg)
+	_, _ = bot.Send(msg)
 }
 
 func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string {
