@@ -30,7 +30,8 @@ type LacesColors struct {
 }
 
 type SalesOptions struct {
-	VIPTablesCount int `env:"VIP_TABLES_COUNT"`
+	VIPTablesCount int   `env:"VIP_TABLES_COUNT"`
+	Prices         []int `env:"PRICES" envSeparator:","`
 }
 
 type Config struct {
@@ -46,25 +47,28 @@ func LoadEnvs() (*Config, error) {
 		return nil, ErrLoadEnvVars
 	}
 
-	var dbCfg DBConfig
+	var (
+		dbCfg        DBConfig
+		tgConfig     TelegramAPIConfig
+		lacesColor   LacesColors
+		salesOptions SalesOptions
+	)
+
 	err = env.Parse(&dbCfg)
 	if err != nil {
 		return nil, errors.Wrap(ErrLoadEnvVars, "DB")
 	}
 
-	var tgConfig TelegramAPIConfig
 	err = env.Parse(&tgConfig)
 	if err != nil {
 		return nil, errors.Wrap(ErrLoadEnvVars, "Telegram API")
 	}
 
-	var lacesColor LacesColors
 	err = env.Parse(&lacesColor)
 	if err != nil {
 		return nil, errors.Wrap(ErrLoadEnvVars, "Lace colors")
 	}
 
-	var salesOptions SalesOptions
 	err = env.Parse(&salesOptions)
 	if err != nil {
 		return nil, errors.Wrap(ErrLoadEnvVars, "Sales options")
