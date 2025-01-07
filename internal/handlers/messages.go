@@ -10,7 +10,7 @@ import (
 	"github.com/qRe0/afterparty-bot/internal/shared"
 )
 
-type TicketsServiceInterface interface {
+type TicketsService interface {
 	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
 	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
 	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)

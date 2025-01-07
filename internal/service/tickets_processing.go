@@ -13,7 +13,7 @@ import (
 	"github.com/qRe0/afterparty-bot/internal/shared"
 )
 
-type TicketsRepoInterface interface {
+type TicketsRepo interface {
 	SearchBySurname(ctx context.Context, surname string) ([]models.TicketResponse, error)
 	MarkAsEntered(ctx context.Context, id string) (*models.TicketResponse, error)
 	CheckCountOfSurnames(ctx context.Context, surname string) (int64, error)
