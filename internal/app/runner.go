@@ -45,7 +45,7 @@ func Run() error {
 
 	repository := ticket_repository.New(db, cfg.DB)
 	log.Println("Repository layer inited")
-	service := ticket_service.New(repository, cfg.LacesColor)
+	service := ticket_service.New(repository, *cfg)
 	log.Println("Service layer inited")
 	handler := handlers.New(service)
 	log.Println("Handler layer inited")

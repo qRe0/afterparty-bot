@@ -13,6 +13,7 @@ import (
 type TicketsService interface {
 	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
 	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
+	SellTicket(ctx context.Context, update *tgbotapi.Update, chatID *int64, bot *tgbotapi.BotAPI)
 	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
 }
 
@@ -70,6 +71,18 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			msg := tgbotapi.NewMessage(chatID, "Введите номер билета (ID):")
 			_, _ = bot.Send(msg)
 			mh.userStates[chatID] = "awaiting_ticket_id"
+		case "Продать билет":
+			messageFormat := "Введите данные покупателя в следующем формате:\n\n" +
+				"ФИО; Тип билета; Цена; Наличие репоста\n\n" +
+				"- Для ВИП билета указывать \"ВИПх\", где х - номер столика;\n" +
+				"- Для обычного билета указывать \"БАЗОВЫЙ\";\n" +
+				"- Если билет продается с репостом писать слово \"репост\", иначе - \"х\"\n\n" +
+				"ВАЖНО:\n" +
+				"- Данный покупателя обязательно вводят через точку с запятой и пробел, то есть '; '\n" +
+				"- Продать ОРГ билет невозможно"
+			msg := tgbotapi.NewMessage(chatID, messageFormat)
+			_, _ = bot.Send(msg)
+			mh.userStates[chatID] = "awaiting_clients_data"
 
 		default:
 			if update.Message.Text != "" {
@@ -77,6 +90,8 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 					mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
 				} else if mh.userStates[chatID] == "awaiting_surname" {
 					mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
+				} else if mh.userStates[chatID] == "awaiting_clients_data" {
+					mh.service.SellTicket(ctx, &update, &chatID, bot)
 				}
 			}
 		}
