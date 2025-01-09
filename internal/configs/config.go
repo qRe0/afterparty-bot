@@ -26,6 +26,7 @@ type TelegramAPIConfig struct {
 type GoogleSheets struct {
 	Secret        string `env:"SECRET_KEY"`
 	DeploymentURL string `env:"DEPLOYMENT_URL"`
+	TableID       string `env:"TABLE_ID"`
 }
 
 type LacesColors struct {
