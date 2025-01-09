@@ -1,10 +1,13 @@
 package ticket_service
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -252,4 +255,38 @@ func (ts *TicketsService) SellTicket(ctx context.Context, update *tgbotapi.Updat
 		log.Println("Failed to update sellers table with data of latest ticket transaction")
 		return
 	}
+
+	err = ts.addRowToGoogleSheet(ctx, client, sellerTag, insertedId)
+	if err != nil {
+		log.Printf("Failed to add data in Google Sheet: %v", err)
+	}
+}
+
+func (ts *TicketsService) addRowToGoogleSheet(ctx context.Context, client models.ClientData, sellerTag string, ticketNo int64) error {
+	data := map[string]interface{}{
+		"secret":     ts.cfg.Sheet.Secret,
+		"TableId":    ts.cfg.Sheet.TableID,
+		"TicketNo":   ticketNo,
+		"FIO":        client.FIO,
+		"TicketType": client.TicketType,
+		"Price":      client.Price,
+		"SellerTag":  sellerTag,
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post(ts.cfg.Sheet.DeploymentURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("received non-OK response: %s", resp.Status)
+	}
+
+	return nil
 }
