@@ -30,8 +30,9 @@ type LacesColors struct {
 }
 
 type SalesOptions struct {
-	VIPTablesCount int   `env:"VIP_TABLES_COUNT"`
-	Prices         []int `env:"PRICES" envSeparator:","`
+	VIPTablesCount int      `env:"VIP_TABLES_COUNT"`
+	Prices         []int    `env:"PRICES" envSeparator:","`
+	Dates          []string `env:"DATES" envSeparator:","`
 }
 
 type Config struct {
