@@ -88,7 +88,7 @@ func (tr *TicketsRepo) MarkAsEntered(ctx context.Context, id string) (*models.Ti
 	var resp models.TicketResponse
 	err = tx.QueryRowContext(ctx, updateQuery, id).Scan(&resp.Id, &resp.Name, &resp.TicketType, &resp.PassedControlZone)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return nil, err
 	}
 
@@ -132,7 +132,7 @@ func (tr *TicketsRepo) SellTicket(ctx context.Context, client models.ClientData,
 	var id int64
 	err = tx.QueryRowContext(ctx, sellTicket, clientSurname, client.FIO, client.TicketType, seller, client.Price, actualPrice).Scan(&id)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return 0, err
 	}
 
@@ -152,7 +152,7 @@ func (tr *TicketsRepo) UpdateSellersTable(ctx context.Context, ticketId, sellerI
 
 	_, err = tx.ExecContext(ctx, updateSellersTable, ticketId, seller, sellerId)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 
