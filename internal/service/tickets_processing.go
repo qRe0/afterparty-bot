@@ -80,7 +80,7 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 	var result strings.Builder
 	result.WriteString("Найдены следующие покупатели:\n\n")
 	for _, resp := range respList {
-		result.WriteString(shared.ResponseMapper(&resp, ts.cfg.LacesColor) + "\n\n")
+		result.WriteString(utils.ResponseMapper(&resp, ts.cfg.LacesColor) + "\n\n")
 	}
 
 	msg := tgbotapi.NewMessage(*chatID, result.String())
@@ -124,7 +124,7 @@ func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID
 
 	var result strings.Builder
 	result.WriteString("Найдены следующие покупатели:\n\n")
-	result.WriteString(shared.ResponseMapper(resp, ts.cfg.LacesColor) + "\n\n")
+	result.WriteString(utils.ResponseMapper(resp, ts.cfg.LacesColor) + "\n\n")
 
 	msg := tgbotapi.NewMessage(*chatID, result.String())
 	_, _ = bot.Send(msg)
@@ -195,7 +195,7 @@ func (ts *TicketsService) SellTicket(ctx context.Context, update *tgbotapi.Updat
 	}
 
 	var client models.ClientData
-	formattedFio, err := shared.FormatFIO(formattedInput[0])
+	formattedFio, err := utils.FormatFIO(formattedInput[0])
 	if err != nil {
 		msg := tgbotapi.NewMessage(*chatID, "Проверьте введенное ФИО")
 		_, _ = bot.Send(msg)
@@ -203,7 +203,7 @@ func (ts *TicketsService) SellTicket(ctx context.Context, update *tgbotapi.Updat
 	}
 	client.FIO = formattedFio
 
-	ticketType, ok := shared.ValidateTicketType(formattedInput[1], ts.cfg.SalesOption)
+	ticketType, ok := utils.ValidateTicketType(formattedInput[1], ts.cfg.SalesOption)
 	if !ok {
 		msg := tgbotapi.NewMessage(*chatID, "Проверьте тип билета или порядок введенных данных. Формат: ФИО; Тип билета; Цена")
 		_, _ = bot.Send(msg)
@@ -211,7 +211,7 @@ func (ts *TicketsService) SellTicket(ctx context.Context, update *tgbotapi.Updat
 	}
 	client.TicketType = ticketType
 
-	price, err := shared.ParseTicketPrice(formattedInput[2])
+	price, err := utils.ParseTicketPrice(formattedInput[2])
 	if err != nil {
 		msg := tgbotapi.NewMessage(*chatID, "Проверьте введенную цену")
 		_, _ = bot.Send(msg)
@@ -219,17 +219,17 @@ func (ts *TicketsService) SellTicket(ctx context.Context, update *tgbotapi.Updat
 	}
 	client.Price = price
 
-	exists := shared.CheckRepost(formattedInput[3])
+	exists := utils.CheckRepost(formattedInput[3])
 	if !exists {
 		client.RepostExists = false
 	} else {
 		client.RepostExists = true
 	}
 
-	actualTicketPrice := shared.CalculateActualTicketPrice(time.Now(), ts.cfg.SalesOption, client)
+	actualTicketPrice := utils.CalculateActualTicketPrice(time.Now(), ts.cfg.SalesOption, client)
 	sellerTag := update.Message.From.UserName
 	sellerId := update.Message.From.ID
-	clientSurname := shared.GetSurnameLowercase(client.FIO)
+	clientSurname := utils.GetSurnameLowercase(client.FIO)
 
 	insertedId, err := ts.repo.SellTicket(ctx, client, sellerTag, clientSurname, actualTicketPrice)
 	if err != nil {
