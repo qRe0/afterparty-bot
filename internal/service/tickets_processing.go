@@ -234,7 +234,7 @@ func (ts *TicketsService) SellTicket(ctx context.Context, update *tgbotapi.Updat
 	sellerId := update.Message.From.ID
 	clientSurname := utils.GetSurnameLowercase(client.FIO)
 
-	insertedId, err := ts.repo.SellTicket(ctx, client, sellerTag, clientSurname, actualTicketPrice)
+	insertedId, err := ts.repo.SellTicket(ctx, client, "@"+sellerTag, clientSurname, actualTicketPrice)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
@@ -250,7 +250,7 @@ func (ts *TicketsService) SellTicket(ctx context.Context, update *tgbotapi.Updat
 	msg := tgbotapi.NewMessage(*chatID, "Билет успешно продан")
 	_, _ = bot.Send(msg)
 
-	err = ts.repo.UpdateSellersTable(ctx, insertedId, sellerId, sellerTag)
+	err = ts.repo.UpdateSellersTable(ctx, insertedId, sellerId, "@"+sellerTag)
 	if err != nil {
 		log.Println("Failed to update sellers table with data of latest ticket transaction")
 		return
