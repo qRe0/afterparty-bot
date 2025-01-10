@@ -36,12 +36,12 @@ func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string
 	failEmoji := "❌"
 
 	var laceColor string
-	switch resp.TicketType {
-	case "ОРГ":
+	switch {
+	case resp.TicketType == "ОРГ":
 		laceColor = cfg.Org
-	case "ВИП":
+	case strings.HasPrefix(resp.TicketType, "ВИП"):
 		laceColor = cfg.VIP
-	case "БАЗОВЫЙ":
+	case resp.TicketType == "БАЗОВЫЙ":
 		laceColor = cfg.Base
 	default:
 		return "Неизвестный тип билета"
