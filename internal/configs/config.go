@@ -23,6 +23,12 @@ type TelegramAPIConfig struct {
 	UsersCount int    `env:"USERS_COUNT"`
 }
 
+type GoogleSheets struct {
+	Secret        string `env:"SECRET_KEY"`
+	DeploymentURL string `env:"DEPLOYMENT_URL"`
+	TableID       string `env:"TABLE_ID"`
+}
+
 type LacesColors struct {
 	Base string `env:"BASE_LACE"`
 	VIP  string `env:"VIP_LACE"`
@@ -40,6 +46,7 @@ type Config struct {
 	TG          TelegramAPIConfig
 	LacesColor  LacesColors
 	SalesOption SalesOptions
+	Sheet       GoogleSheets
 }
 
 func LoadEnvs() (*Config, error) {
@@ -53,6 +60,7 @@ func LoadEnvs() (*Config, error) {
 		tgConfig     TelegramAPIConfig
 		lacesColor   LacesColors
 		salesOptions SalesOptions
+		sheet        GoogleSheets
 	)
 
 	err = env.Parse(&dbCfg)
@@ -75,11 +83,17 @@ func LoadEnvs() (*Config, error) {
 		return nil, errors.Wrap(ErrLoadEnvVars, "Sales options")
 	}
 
+	err = env.Parse(&sheet)
+	if err != nil {
+		return nil, errors.Wrap(ErrLoadEnvVars, "Google Sheets")
+	}
+
 	cfg := &Config{
 		DB:          dbCfg,
 		TG:          tgConfig,
 		LacesColor:  lacesColor,
 		SalesOption: salesOptions,
+		Sheet:       sheet,
 	}
 
 	return cfg, nil

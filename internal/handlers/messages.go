@@ -60,7 +60,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		switch update.Message.Text {
 		case "/start":
-			shared.ShowOptions(chatID, bot)
+			utils.ShowOptions(chatID, bot)
 
 		case "Фамилия":
 			msg := tgbotapi.NewMessage(chatID, "Введите фамилию или часть фамилии для поиска в списках:")
