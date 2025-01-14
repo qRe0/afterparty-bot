@@ -79,7 +79,9 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				"- Если билет продается с репостом писать слово \"репост\", иначе - \"х\"\n\n" +
 				"ВАЖНО:\n" +
 				"- Данный покупателя обязательно вводят через точку с запятой и пробел, то есть '; '\n" +
-				"- Продать ОРГ билет невозможно"
+				"- Продать ОРГ билет невозможно\n\n" +
+				"ПРИМЕР:\n" +
+				"Иванов Иван Иванович; БАЗОВЫЙ/ВИПх; 15р; репост/х"
 			msg := tgbotapi.NewMessage(chatID, messageFormat)
 			_, _ = bot.Send(msg)
 			mh.userStates[chatID] = "awaiting_clients_data"
