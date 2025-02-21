@@ -25,10 +25,12 @@ func New(db *sqlx.DB, cfg configs.DBConfig) *TicketsRepo {
 const (
 	connectingStringTemplate = "postgres://%s:%s@%s:%s/%s?sslmode=disable"
 
-	findClientByFullSurname = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE surname=$1"
-	findClientBySurname     = "SELECT id, full_name, ticket_type, passed_control_zone  FROM tickets WHERE surname LIKE $1"
-	updateQuery             = "UPDATE tickets SET passed_control_zone = true WHERE id = $1 RETURNING id, full_name, ticket_type, passed_control_zone"
-	searchById              = "SELECT id, full_name, ticket_type, passed_control_zone FROM tickets WHERE id=$1"
+	findClientByFullSurname = "SELECT ticketno, full_name, ticket_type, passed_control_zone FROM tickets WHERE surname=$1"
+	findClientBySurname     = "SELECT ticketno, full_name, ticket_type, passed_control_zone  FROM tickets WHERE surname LIKE $1"
+	updateQuery             = "UPDATE tickets SET passed_control_zone = true WHERE ticketno = $1 RETURNING ticketno, full_name, ticket_type, passed_control_zone"
+	searchById              = "SELECT ticketno, full_name, ticket_type, passed_control_zone FROM tickets WHERE ticketno=$1"
+	sellTicket              = "INSERT INTO tickets (surname, full_name, ticket_type, seller_name, ticket_price, actual_ticket_price, ticketno) VALUES ($1, $2, $3, $4, $5, $6, (SELECT COALESCE(MAX(ticketNo), 0) + 1 FROM tickets)) RETURNING ticketNo"
+	updateSellersTable      = "INSERT INTO ticket_sellers (ticket_id, seller_tag, seller_tg_id) VALUES ($1, $2, $3)"
 )
 
 func NewDatabaseConnection(cfg configs.DBConfig) (*sqlx.DB, error) {
@@ -86,7 +88,7 @@ func (tr *TicketsRepo) MarkAsEntered(ctx context.Context, id string) (*models.Ti
 	var resp models.TicketResponse
 	err = tx.QueryRowContext(ctx, updateQuery, id).Scan(&resp.Id, &resp.Name, &resp.TicketType, &resp.PassedControlZone)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return nil, err
 	}
 
@@ -120,4 +122,44 @@ func (tr *TicketsRepo) SearchById(ctx context.Context, id string) (*models.Ticke
 	}
 
 	return &resp, nil
+}
+
+func (tr *TicketsRepo) SellTicket(ctx context.Context, client models.ClientData, seller string, clientSurname string, actualPrice int) (int64, error) {
+	tx, err := tr.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	var id int64
+	err = tx.QueryRowContext(ctx, sellTicket, clientSurname, client.FIO, client.TicketType, seller, client.Price, actualPrice).Scan(&id)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return 0, err
+	}
+
+	return id, nil
+}
+
+func (tr *TicketsRepo) UpdateSellersTable(ctx context.Context, ticketId, sellerId int64, seller string) error {
+	tx, err := tr.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, updateSellersTable, ticketId, seller, sellerId)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
