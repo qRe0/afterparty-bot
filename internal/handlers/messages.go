@@ -3,11 +3,13 @@ package handlers
 import (
 	"context"
 	"log"
+	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/qRe0/afterparty-bot/internal/models"
 	"github.com/qRe0/afterparty-bot/internal/service"
-	"github.com/qRe0/afterparty-bot/internal/shared"
+	utils "github.com/qRe0/afterparty-bot/internal/shared"
 )
 
 type TicketsService interface {
@@ -20,12 +22,14 @@ type TicketsService interface {
 type MessagesHandler struct {
 	service    *ticket_service.TicketsService
 	userStates map[int64]string
+	clientData map[int64]*models.ClientData
 }
 
 func New(service *ticket_service.TicketsService) MessagesHandler {
 	return MessagesHandler{
 		service:    service,
 		userStates: make(map[int64]string),
+		clientData: make(map[int64]*models.ClientData),
 	}
 }
 
@@ -57,45 +61,106 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 	if update.Message != nil {
 		chatID = update.Message.Chat.ID
+		text := update.Message.Text
 
-		switch update.Message.Text {
+		switch text {
 		case "/start":
+			mh.userStates[chatID] = ""
 			utils.ShowOptions(chatID, bot)
+			return
 
-		case "Фамилия":
-			msg := tgbotapi.NewMessage(chatID, "Введите фамилию или часть фамилии для поиска в списках:")
+		case "Отметить вход":
+			mh.userStates[chatID] = "awaiting_id_surname"
+			msg := tgbotapi.NewMessage(chatID, "Введите фамилию или номер билета для поиска:")
 			_, _ = bot.Send(msg)
-			mh.userStates[chatID] = "awaiting_surname"
+			return
 
-		case "Номер билета (ID)":
-			msg := tgbotapi.NewMessage(chatID, "Введите номер билета (ID):")
-			_, _ = bot.Send(msg)
-			mh.userStates[chatID] = "awaiting_ticket_id"
 		case "Продать билет":
-			messageFormat := "Введите данные покупателя в следующем формате:\n\n" +
-				"ФИО; Тип билета; Цена; Наличие репоста\n\n" +
-				"- Для ВИП билета указывать \"ВИПх\", где х - номер столика;\n" +
-				"- Для обычного билета указывать \"БАЗОВЫЙ\";\n" +
-				"- Если билет продается с репостом писать слово \"репост\", иначе - \"х\"\n\n" +
-				"ВАЖНО:\n" +
-				"- Данный покупателя обязательно вводят через точку с запятой и пробел, то есть '; '\n" +
-				"- Продать ОРГ билет невозможно\n\n" +
-				"ПРИМЕР:\n" +
-				"Иванов Иван Иванович; БАЗОВЫЙ/ВИПх; 15р; репост/х"
-			msg := tgbotapi.NewMessage(chatID, messageFormat)
+			mh.clientData[chatID] = &models.ClientData{}
+			mh.userStates[chatID] = "awaiting_client_fio"
+			msg := tgbotapi.NewMessage(chatID, "Введите ФИО покупателя:")
 			_, _ = bot.Send(msg)
-			mh.userStates[chatID] = "awaiting_clients_data"
+			return
+		}
 
-		default:
-			if update.Message.Text != "" {
-				if mh.userStates[chatID] == "awaiting_ticket_id" {
-					mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
-				} else if mh.userStates[chatID] == "awaiting_surname" {
-					mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
-				} else if mh.userStates[chatID] == "awaiting_clients_data" {
-					mh.service.SellTicket(ctx, &update, &chatID, bot)
-				}
+		switch mh.userStates[chatID] {
+		case "awaiting_id_surname":
+			if _, err := strconv.Atoi(text); err == nil {
+				log.Println("messages.HandleMessages: Ищем пользователя по номеру билета")
+				mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
+			} else {
+				log.Println("messages.HandleMessages: Ищем пользователя по фамилии")
+				mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
 			}
+		case "awaiting_client_fio":
+			if text == "" {
+				msg := tgbotapi.NewMessage(chatID, "ФИО не может быть пустым. Введите ещё раз:")
+				_, _ = bot.Send(msg)
+				return
+			}
+			formattedFio, err := utils.FormatFIO(text)
+			if err != nil {
+				msg := tgbotapi.NewMessage(chatID, "Проверьте введенное ФИО")
+				_, _ = bot.Send(msg)
+				return
+			}
+			mh.clientData[chatID].FIO = formattedFio
+			msg := tgbotapi.NewMessage(chatID, "Введите тип билета:")
+			_, _ = bot.Send(msg)
+			mh.userStates[chatID] = "awaiting_client_ticketType"
+		case "awaiting_client_ticketType":
+			if text == "" {
+				msg := tgbotapi.NewMessage(chatID, "Введите тип билета:")
+				_, _ = bot.Send(msg)
+				return
+			}
+
+			ticketType, ok := utils.ValidateTicketType(text, mh.service.Cfg.SalesOption)
+			if !ok {
+				msg := tgbotapi.NewMessage(chatID, "Неверный тип билета. Попробуйте ещё раз:")
+				_, _ = bot.Send(msg)
+				return
+			}
+
+			mh.clientData[chatID].TicketType = ticketType
+			msg := tgbotapi.NewMessage(chatID, "Введите стоимость билета:")
+			_, _ = bot.Send(msg)
+			mh.userStates[chatID] = "awaiting_client_price"
+		case "awaiting_client_price":
+			if text == "" {
+				msg := tgbotapi.NewMessage(chatID, "Цена не может быть пустой. Повторите ввод:")
+				_, _ = bot.Send(msg)
+				return
+			}
+
+			price, err := utils.ParseTicketPrice(text)
+			if err != nil {
+				msg := tgbotapi.NewMessage(chatID, "Проверьте введенную цену. Попробуйте ещё раз:")
+				_, _ = bot.Send(msg)
+				return
+			}
+			mh.clientData[chatID].Price = price
+
+			msg := tgbotapi.NewMessage(chatID, "Укажите наличие репоста (да/нет):")
+			_, _ = bot.Send(msg)
+			mh.userStates[chatID] = "awaiting_client_repost"
+
+		case "awaiting_client_repost":
+			if text == "" {
+				msg := tgbotapi.NewMessage(chatID, "Ответ не может быть пустым. Укажите наличие репоста (да/нет):")
+				_, _ = bot.Send(msg)
+				return
+			}
+
+			mh.clientData[chatID].RepostExists = utils.CheckRepost(text)
+
+			err := mh.service.SellTicket(ctx, chatID, update, bot, mh.clientData[chatID])
+			if err != nil {
+				log.Printf("Ошибка при продаже билета: %v", err)
+			}
+
+			mh.userStates[chatID] = ""
+			delete(mh.clientData, chatID)
 		}
 	}
 }

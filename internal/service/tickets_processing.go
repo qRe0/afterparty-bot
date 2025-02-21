@@ -30,13 +30,13 @@ type TicketsRepo interface {
 
 type TicketsService struct {
 	repo *ticket_repository.TicketsRepo
-	cfg  configs.Config
+	Cfg  configs.Config
 }
 
 func New(repo *ticket_repository.TicketsRepo, cfg configs.Config) *TicketsService {
 	return &TicketsService{
 		repo: repo,
-		cfg:  cfg,
+		Cfg:  cfg,
 	}
 }
 
@@ -83,7 +83,7 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 	var result strings.Builder
 	result.WriteString("Найдены следующие покупатели:\n\n")
 	for _, resp := range respList {
-		result.WriteString(utils.ResponseMapper(&resp, ts.cfg.LacesColor) + "\n\n")
+		result.WriteString(utils.ResponseMapper(&resp, ts.Cfg.LacesColor) + "\n\n")
 	}
 
 	msg := tgbotapi.NewMessage(*chatID, result.String())
@@ -120,14 +120,14 @@ func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID
 
 	resp, err := ts.repo.SearchById(ctx, *userId)
 	if err != nil {
-		msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
+		msg := tgbotapi.NewMessage(*chatID, "Нет покупателей с указанным номером билета")
 		_, _ = bot.Send(msg)
 		return
 	}
 
 	var result strings.Builder
 	result.WriteString("Найдены следующие покупатели:\n\n")
-	result.WriteString(utils.ResponseMapper(resp, ts.cfg.LacesColor) + "\n\n")
+	result.WriteString(utils.ResponseMapper(resp, ts.Cfg.LacesColor) + "\n\n")
 
 	msg := tgbotapi.NewMessage(*chatID, result.String())
 	_, _ = bot.Send(msg)
@@ -171,101 +171,58 @@ func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, cha
 	_, _ = bot.Send(msg)
 }
 
-func (ts *TicketsService) SellTicket(ctx context.Context, update *tgbotapi.Update, chatID *int64, bot *tgbotapi.BotAPI) {
-	clientDetails := &update.Message.Text
-
-	if clientDetails == nil || *clientDetails == "" {
-		msg := tgbotapi.NewMessage(*chatID, "service.SellTicket: Предоставлены пустые данные клиента")
-		_, _ = bot.Send(msg)
-		return
-	}
-
-	if chatID == nil {
-		msg := tgbotapi.NewMessage(-1, "service.SellTicket: Предоставлен пустой ID чата")
-		_, _ = bot.Send(msg)
-		return
+func (ts *TicketsService) SellTicket(
+	ctx context.Context,
+	chatID int64,
+	update tgbotapi.Update,
+	bot *tgbotapi.BotAPI,
+	client *models.ClientData,
+) error {
+	if client == nil {
+		return fmt.Errorf("SellTicket: client is nil")
 	}
 
 	if bot == nil {
-		log.Fatalln("service.SellTicket: Пустой инстанс бота")
+		return fmt.Errorf("SellTicket: bot is nil")
 	}
 
-	formattedInput := strings.Split(*clientDetails, "; ")
-	if len(formattedInput) != 4 {
-		msg := tgbotapi.NewMessage(*chatID, "Проверьте формат введеных даных")
-		_, _ = bot.Send(msg)
-		return
-	}
-
-	var client models.ClientData
-	formattedFio, err := utils.FormatFIO(formattedInput[0])
-	if err != nil {
-		msg := tgbotapi.NewMessage(*chatID, "Проверьте введенное ФИО")
-		_, _ = bot.Send(msg)
-		return
-	}
-	client.FIO = formattedFio
-
-	ticketType, ok := utils.ValidateTicketType(formattedInput[1], ts.cfg.SalesOption)
-	if !ok {
-		msg := tgbotapi.NewMessage(*chatID, "Проверьте тип билета или порядок введенных данных. Формат: ФИО; Тип билета; Цена")
-		_, _ = bot.Send(msg)
-		return
-	}
-	client.TicketType = ticketType
-
-	price, err := utils.ParseTicketPrice(formattedInput[2])
-	if err != nil {
-		msg := tgbotapi.NewMessage(*chatID, "Проверьте введенную цену")
-		_, _ = bot.Send(msg)
-		return
-	}
-	client.Price = price
-
-	exists := utils.CheckRepost(formattedInput[3])
-	if !exists {
-		client.RepostExists = false
-	} else {
-		client.RepostExists = true
-	}
-
-	actualTicketPrice := utils.CalculateActualTicketPrice(time.Now(), ts.cfg.SalesOption, client)
+	clientSurname := utils.GetSurnameLowercase(client.FIO)
+	actualTicketPrice := utils.CalculateActualTicketPrice(time.Now(), ts.Cfg.SalesOption, *client)
 	sellerTag := update.Message.From.UserName
 	sellerId := update.Message.From.ID
-	clientSurname := utils.GetSurnameLowercase(client.FIO)
 
-	insertedId, err := ts.repo.SellTicket(ctx, client, "@"+sellerTag, clientSurname, actualTicketPrice)
+	insertedId, err := ts.repo.SellTicket(ctx, *client, "@"+sellerTag, clientSurname, actualTicketPrice)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
-			msg := tgbotapi.NewMessage(*chatID, "Данный покупатель уже купил билет")
+			msg := tgbotapi.NewMessage(chatID, "Данный покупатель уже купил билет")
 			_, _ = bot.Send(msg)
-			return
+			return err
 		}
-		msg := tgbotapi.NewMessage(*chatID, "Не удалось выполнить продажу билета. Попробуйте еще раз")
+		msg := tgbotapi.NewMessage(chatID, "Не удалось выполнить продажу билета. Попробуйте еще раз")
 		_, _ = bot.Send(msg)
-		return
+		return err
 	}
 
-	msg := tgbotapi.NewMessage(*chatID, "Билет успешно продан")
+	msg := tgbotapi.NewMessage(chatID, "Билет успешно продан")
 	_, _ = bot.Send(msg)
 
 	err = ts.repo.UpdateSellersTable(ctx, insertedId, sellerId, "@"+sellerTag)
 	if err != nil {
-		log.Println("Failed to update sellers table with data of latest ticket transaction")
-		return
+		log.Println("Не удалось обновить базу данных продавцов информацией о последней транзакции:", err)
 	}
 
-	err = ts.addRowToGoogleSheet(ctx, client, sellerTag, insertedId)
-	if err != nil {
-		log.Printf("Failed to add data in Google Sheet: %v", err)
+	if err := ts.addRowToGoogleSheet(ctx, *client, sellerTag, insertedId); err != nil {
+		log.Printf("Не удалось добавить данные в Google Таблицу: %v", err)
 	}
+
+	return nil
 }
 
-func (ts *TicketsService) addRowToGoogleSheet(ctx context.Context, client models.ClientData, sellerTag string, ticketNo int64) error {
+func (ts *TicketsService) addRowToGoogleSheet(_ context.Context, client models.ClientData, sellerTag string, ticketNo int64) error {
 	data := map[string]interface{}{
-		"secret":     ts.cfg.Sheet.Secret,
-		"TableId":    ts.cfg.Sheet.TableID,
+		"secret":     ts.Cfg.Sheet.Secret,
+		"TableId":    ts.Cfg.Sheet.TableID,
 		"TicketNo":   ticketNo,
 		"FIO":        client.FIO,
 		"TicketType": client.TicketType,
@@ -278,7 +235,7 @@ func (ts *TicketsService) addRowToGoogleSheet(ctx context.Context, client models
 		return err
 	}
 
-	resp, err := http.Post(ts.cfg.Sheet.DeploymentURL, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(ts.Cfg.Sheet.DeploymentURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
