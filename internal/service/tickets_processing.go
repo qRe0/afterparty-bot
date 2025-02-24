@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fogleman/gg"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/lib/pq"
 	"github.com/qRe0/afterparty-bot/internal/configs"
@@ -26,6 +27,7 @@ type TicketsRepo interface {
 	SearchById(ctx context.Context, id string) (*models.TicketResponse, error)
 	SellTicket(ctx context.Context, client models.ClientData, seller string, clientSurname string, actualPrice int) (int64, error)
 	UpdateSellersTable(ctx context.Context, ticketId, sellerId int64, seller string) error
+	GetActualTicketNumber(ctx context.Context, ticketNo int64) (*int, error)
 }
 
 type TicketsService struct {
@@ -191,7 +193,7 @@ func (ts *TicketsService) SellTicket(
 	sellerTag := update.Message.From.UserName
 	sellerId := update.Message.From.ID
 
-	insertedId, err := ts.repo.SellTicket(ctx, *client, "@"+sellerTag, clientSurname, actualTicketPrice)
+	ticketNo, err := ts.repo.SellTicket(ctx, *client, "@"+sellerTag, clientSurname, actualTicketPrice)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
@@ -204,16 +206,32 @@ func (ts *TicketsService) SellTicket(
 		return err
 	}
 
-	msg := tgbotapi.NewMessage(chatID, "Билет успешно продан")
+	msgTmpl := fmt.Sprintf("Билет успешно продан!\nФИО покупателя: %s, номер билета: %d", client.FIO, ticketNo)
+	msg := tgbotapi.NewMessage(chatID, msgTmpl)
 	_, _ = bot.Send(msg)
 
-	err = ts.repo.UpdateSellersTable(ctx, insertedId, sellerId, "@"+sellerTag)
+	err = ts.repo.UpdateSellersTable(ctx, ticketNo, sellerId, "@"+sellerTag)
 	if err != nil {
 		log.Println("Не удалось обновить базу данных продавцов информацией о последней транзакции:", err)
 	}
 
-	if err := ts.addRowToGoogleSheet(ctx, *client, sellerTag, insertedId); err != nil {
+	if err := ts.addRowToGoogleSheet(ctx, *client, sellerTag, ticketNo); err != nil {
 		log.Printf("Не удалось добавить данные в Google Таблицу: %v", err)
+	}
+
+	imageBuffer, err := ts.generateTicketImage(ticketNo)
+	if err != nil {
+		log.Println("Ошибка при генерации изображения")
+		return nil
+	}
+
+	photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileBytes{
+		Name:  "ticket.png",
+		Bytes: imageBuffer.Bytes(),
+	})
+	photoMsg.Caption = fmt.Sprintf("Покупатель: %s\nНомер билета: %d", client.FIO, ticketNo)
+	if _, err = bot.Send(photoMsg); err != nil {
+		log.Println("Ошибка при отправке фото")
 	}
 
 	return nil
@@ -246,4 +264,38 @@ func (ts *TicketsService) addRowToGoogleSheet(_ context.Context, client models.C
 	}
 
 	return nil
+}
+
+func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, error) {
+	const (
+		backgroundPath = "ticket.png"
+		fontPath       = "font.ttf"
+		fontSize       = 82
+		posX, posY     = 1450, 895
+	)
+
+	bg, err := gg.LoadImage(backgroundPath)
+	if err != nil {
+		log.Printf("не удалось загрузить фоновое изображение: %w", err)
+		return nil, fmt.Errorf("не удалось загрузить фоновое изображение: %w", err)
+	}
+
+	dc := gg.NewContextForImage(bg)
+
+	if err := dc.LoadFontFace(fontPath, fontSize); err != nil {
+		log.Printf("не удалось загрузить шрифт: %w", err)
+		return nil, fmt.Errorf("не удалось загрузить шрифт: %w", err)
+	}
+
+	dc.SetHexColor("#f88707")
+	ticketText := fmt.Sprintf("%d", ticketNo)
+	dc.DrawStringAnchored(ticketText, posX, posY, 0.5, 0.5)
+
+	var buf bytes.Buffer
+	if err := dc.EncodePNG(&buf); err != nil {
+		log.Printf("не удалось закодировать PNG: %w", err)
+		return nil, fmt.Errorf("не удалось закодировать PNG: %w", err)
+	}
+
+	return &buf, nil
 }
