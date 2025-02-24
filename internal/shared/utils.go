@@ -18,11 +18,10 @@ const (
 )
 
 func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
-	msg := tgbotapi.NewMessage(chatID, "Выберите опцию поиска покупателя:")
+	msg := tgbotapi.NewMessage(chatID, "Выберите опцию:")
 	keyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Фамилия"),
-			tgbotapi.NewKeyboardButton("Номер билета (ID)"),
+			tgbotapi.NewKeyboardButton("Отметить вход"),
 			tgbotapi.NewKeyboardButton("Продать билет"),
 		),
 	)
@@ -116,11 +115,13 @@ func CheckRepost(msg string) bool {
 	}
 	keyWord := parts[0]
 
-	if keyWord != "репост" {
+	if keyWord == "да" {
+		return true
+	} else if keyWord == "нет" {
 		return false
 	}
 
-	return true
+	return false
 }
 
 func convertStringsToDates(dates []string) ([]time.Time, error) {
