@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/qRe0/afterparty-bot/internal/configs"
 	"github.com/qRe0/afterparty-bot/internal/models"
 	"github.com/qRe0/afterparty-bot/internal/service"
 	utils "github.com/qRe0/afterparty-bot/internal/shared"
@@ -15,7 +16,7 @@ import (
 type TicketsService interface {
 	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
 	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
-	SellTicket(ctx context.Context, update *tgbotapi.Update, chatID *int64, bot *tgbotapi.BotAPI)
+	SellTicket(ctx context.Context, chatID int64, update tgbotapi.Update, bot *tgbotapi.BotAPI, client *models.ClientData) error
 	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
 }
 
@@ -23,13 +24,15 @@ type MessagesHandler struct {
 	service    *ticket_service.TicketsService
 	userStates map[int64]string
 	clientData map[int64]*models.ClientData
+	cfg        configs.AllowList
 }
 
-func New(service *ticket_service.TicketsService) MessagesHandler {
+func New(service *ticket_service.TicketsService, cfg configs.AllowList) MessagesHandler {
 	return MessagesHandler{
 		service:    service,
 		userStates: make(map[int64]string),
 		clientData: make(map[int64]*models.ClientData),
+		cfg:        cfg,
 	}
 }
 
@@ -62,20 +65,36 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 	if update.Message != nil {
 		chatID = update.Message.Chat.ID
 		text := update.Message.Text
+		userName := update.Message.From.UserName
 
 		switch text {
 		case "/start":
+			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) && !utils.UserInList(userName, mh.cfg.AllowedSellers) {
+				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав на использование бота.")
+				bot.Send(msg)
+				return
+			}
 			mh.userStates[chatID] = ""
 			utils.ShowOptions(chatID, bot)
 			return
 
 		case "Отметить вход":
+			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) {
+				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для отметки входа.")
+				bot.Send(msg)
+				return
+			}
 			mh.userStates[chatID] = "awaiting_id_surname"
 			msg := tgbotapi.NewMessage(chatID, "Введите фамилию или номер билета для поиска:")
 			_, _ = bot.Send(msg)
 			return
 
 		case "Продать билет":
+			if !utils.UserInList(userName, mh.cfg.AllowedSellers) {
+				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для продажи билетов.")
+				bot.Send(msg)
+				return
+			}
 			mh.clientData[chatID] = &models.ClientData{}
 			mh.userStates[chatID] = "awaiting_client_fio"
 			msg := tgbotapi.NewMessage(chatID, "Введите ФИО покупателя:")
@@ -105,7 +124,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				return
 			}
 			mh.clientData[chatID].FIO = formattedFio
-			msg := tgbotapi.NewMessage(chatID, "Введите тип билета:")
+			msg := tgbotapi.NewMessage(chatID, "Введите тип билета (ВИПх или БАЗОВЫЙ):")
 			_, _ = bot.Send(msg)
 			mh.userStates[chatID] = "awaiting_client_ticketType"
 		case "awaiting_client_ticketType":
