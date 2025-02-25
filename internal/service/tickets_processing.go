@@ -27,7 +27,6 @@ type TicketsRepo interface {
 	SearchById(ctx context.Context, id string) (*models.TicketResponse, error)
 	SellTicket(ctx context.Context, client models.ClientData, seller string, clientSurname string, actualPrice int) (int64, error)
 	UpdateSellersTable(ctx context.Context, ticketId, sellerId int64, seller string) error
-	GetActualTicketNumber(ctx context.Context, ticketNo int64) (*int, error)
 }
 
 type TicketsService struct {
@@ -215,7 +214,7 @@ func (ts *TicketsService) SellTicket(
 		log.Println("Не удалось обновить базу данных продавцов информацией о последней транзакции:", err)
 	}
 
-	if err := ts.addRowToGoogleSheet(ctx, *client, sellerTag, ticketNo); err != nil {
+	if err := ts.addRowToGoogleSheet(*client, sellerTag, ticketNo); err != nil {
 		log.Printf("Не удалось добавить данные в Google Таблицу: %v", err)
 	}
 
@@ -237,7 +236,7 @@ func (ts *TicketsService) SellTicket(
 	return nil
 }
 
-func (ts *TicketsService) addRowToGoogleSheet(_ context.Context, client models.ClientData, sellerTag string, ticketNo int64) error {
+func (ts *TicketsService) addRowToGoogleSheet(client models.ClientData, sellerTag string, ticketNo int64) error {
 	data := map[string]interface{}{
 		"secret":     ts.Cfg.Sheet.Secret,
 		"TableId":    ts.Cfg.Sheet.TableID,
@@ -276,15 +275,15 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 
 	bg, err := gg.LoadImage(backgroundPath)
 	if err != nil {
-		log.Printf("не удалось загрузить фоновое изображение: %w", err)
-		return nil, fmt.Errorf("не удалось загрузить фоновое изображение: %w", err)
+		log.Printf("Не удалось загрузить фоновое изображение: %v", err)
+		return nil, fmt.Errorf("failed to load background image: %v", err)
 	}
 
 	dc := gg.NewContextForImage(bg)
 
 	if err := dc.LoadFontFace(fontPath, fontSize); err != nil {
-		log.Printf("не удалось загрузить шрифт: %w", err)
-		return nil, fmt.Errorf("не удалось загрузить шрифт: %w", err)
+		log.Printf("Не удалось загрузить шрифт: %v", err)
+		return nil, fmt.Errorf("failed to load font: %v", err)
 	}
 
 	dc.SetHexColor("#f88707")
@@ -293,8 +292,8 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 
 	var buf bytes.Buffer
 	if err := dc.EncodePNG(&buf); err != nil {
-		log.Printf("не удалось закодировать PNG: %w", err)
-		return nil, fmt.Errorf("не удалось закодировать PNG: %w", err)
+		log.Printf("Не удалось закодировать PNG: %v", err)
+		return nil, fmt.Errorf("failed to encode .png file: %v", err)
 	}
 
 	return &buf, nil
