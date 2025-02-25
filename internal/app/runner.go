@@ -47,7 +47,7 @@ func Run() error {
 	log.Println("Repository layer inited")
 	service := ticket_service.New(repository, *cfg)
 	log.Println("Service layer inited")
-	handler := handlers.New(service)
+	handler := handlers.New(service, cfg.AllowList)
 	log.Println("Handler layer inited")
 
 	u := tgbotapi.NewUpdate(0)

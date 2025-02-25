@@ -41,12 +41,23 @@ type SalesOptions struct {
 	Dates          []string `env:"DATES" envSeparator:","`
 }
 
+type tempAllowList struct {
+	AllowedSellers  []string `env:"ALLOWED_SELLERS"  envSeparator:","`
+	AllowedCheckers []string `env:"ALLOWED_CHECKERS" envSeparator:","`
+}
+
+type AllowList struct {
+	AllowedSellers  map[string]bool
+	AllowedCheckers map[string]bool
+}
+
 type Config struct {
 	DB          DBConfig
 	TG          TelegramAPIConfig
 	LacesColor  LacesColors
 	SalesOption SalesOptions
 	Sheet       GoogleSheets
+	AllowList   AllowList
 }
 
 func LoadEnvs() (*Config, error) {
@@ -61,6 +72,7 @@ func LoadEnvs() (*Config, error) {
 		lacesColor   LacesColors
 		salesOptions SalesOptions
 		sheet        GoogleSheets
+		tmpAllowList tempAllowList
 	)
 
 	err = env.Parse(&dbCfg)
@@ -88,12 +100,31 @@ func LoadEnvs() (*Config, error) {
 		return nil, errors.Wrap(ErrLoadEnvVars, "Google Sheets")
 	}
 
+	err = env.Parse(&tmpAllowList)
+	if err != nil {
+		return nil, errors.Wrap(ErrLoadEnvVars, "List of allowed users")
+	}
+
+	allowedSellersMap := make(map[string]bool)
+	for _, seller := range tmpAllowList.AllowedSellers {
+		allowedSellersMap[seller] = true
+	}
+
+	allowedCheckersMap := make(map[string]bool)
+	for _, checker := range tmpAllowList.AllowedCheckers {
+		allowedCheckersMap[checker] = true
+	}
+
 	cfg := &Config{
 		DB:          dbCfg,
 		TG:          tgConfig,
 		LacesColor:  lacesColor,
 		SalesOption: salesOptions,
 		Sheet:       sheet,
+		AllowList: AllowList{
+			AllowedSellers:  allowedSellersMap,
+			AllowedCheckers: allowedCheckersMap,
+		},
 	}
 
 	return cfg, nil

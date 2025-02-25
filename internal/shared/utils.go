@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -32,8 +33,8 @@ func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
 }
 
 func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string {
-	successEmoji := "✅✅✅✅✅"
-	failEmoji := "❌❌❌❌❌"
+	successEmoji := "ДА ✅✅✅"
+	failEmoji := "НЕТ ❌❌❌"
 
 	var laceColor string
 	switch {
@@ -192,4 +193,13 @@ func GetSurnameLowercase(surname string) string {
 
 	formattedSurname := strings.ToLower(parts[0])
 	return formattedSurname
+}
+
+func UserInList(userName string, list map[string]bool) bool {
+	_, ok := list[userName]
+	if !ok {
+		log.Println("Unknown user is trying to use bot")
+		return false
+	}
+	return true
 }

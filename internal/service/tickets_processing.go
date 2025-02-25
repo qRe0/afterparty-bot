@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fogleman/gg"
@@ -32,6 +33,7 @@ type TicketsRepo interface {
 type TicketsService struct {
 	repo *ticket_repository.TicketsRepo
 	Cfg  configs.Config
+	mu   sync.Mutex
 }
 
 func New(repo *ticket_repository.TicketsRepo, cfg configs.Config) *TicketsService {
@@ -213,6 +215,9 @@ func (ts *TicketsService) SellTicket(
 	if err != nil {
 		log.Println("Не удалось обновить базу данных продавцов информацией о последней транзакции:", err)
 	}
+
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
 
 	if err := ts.addRowToGoogleSheet(*client, sellerTag, ticketNo); err != nil {
 		log.Printf("Не удалось добавить данные в Google Таблицу: %v", err)
