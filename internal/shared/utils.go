@@ -15,6 +15,7 @@ import (
 const (
 	vipTicketTypeTemplate = "ВИП%d"
 	formattedFIOTemplate  = "%s %s %s"
+	formattedFITemplate   = "%s %s"
 )
 
 func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
@@ -31,8 +32,8 @@ func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
 }
 
 func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string {
-	successEmoji := "✅"
-	failEmoji := "❌"
+	successEmoji := "✅✅✅✅✅"
+	failEmoji := "❌❌❌❌❌"
 
 	var laceColor string
 	switch {
@@ -51,7 +52,7 @@ func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string
 		controlStatus = successEmoji
 	}
 
-	return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s,\nПрошел контроль: %s",
+	return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s,\nПрошел контроль? - %s",
 		resp.Id, resp.Name, resp.TicketType, laceColor, controlStatus)
 }
 
@@ -89,18 +90,20 @@ func ParseTicketPrice(input string) (int, error) {
 
 	value, err := strconv.Atoi(match)
 	if err != nil {
-		return 0, fmt.Errorf("failes to parse string to int %q: %v", match, err)
+		return 0, fmt.Errorf("failed to parse string to int %q: %v", match, err)
 	}
 
 	return value, nil
 }
 
 func FormatFIO(fio string) (string, error) {
-	var err error
 	parts := strings.Fields(fio)
 
-	if len(parts) != 3 {
-		return "", err
+	if len(parts) < 2 {
+		return "", fmt.Errorf("failed to parse client's full name")
+	}
+	if len(parts) == 2 {
+		return fmt.Sprintf(formattedFITemplate, parts[0], parts[1]), nil
 	}
 
 	return fmt.Sprintf(formattedFIOTemplate, parts[0], parts[1], parts[2]), nil
@@ -150,6 +153,7 @@ func convertStringsToDates(dates []string) ([]time.Time, error) {
 
 // dates = {xxx} ->
 // dates[0] - дата повышения
+// dates[1] - дата конца продаж
 
 func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, client models.ClientData) int {
 	dates, err := convertStringsToDates(cfg.Dates)
@@ -182,7 +186,7 @@ func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, cli
 func GetSurnameLowercase(surname string) string {
 	parts := strings.Split(surname, " ")
 
-	if len(parts) != 3 {
+	if len(parts) < 2 {
 		return ""
 	}
 
