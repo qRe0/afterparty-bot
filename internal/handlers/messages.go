@@ -15,7 +15,7 @@ import (
 type TicketsService interface {
 	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
 	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
-	SellTicket(ctx context.Context, update *tgbotapi.Update, chatID *int64, bot *tgbotapi.BotAPI)
+	SellTicket(ctx context.Context, chatID int64, update tgbotapi.Update, bot *tgbotapi.BotAPI, client *models.ClientData) error
 	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
 }
 
@@ -105,7 +105,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				return
 			}
 			mh.clientData[chatID].FIO = formattedFio
-			msg := tgbotapi.NewMessage(chatID, "Введите тип билета:")
+			msg := tgbotapi.NewMessage(chatID, "Введите тип билета (ВИПх или БАЗОВЫЙ):")
 			_, _ = bot.Send(msg)
 			mh.userStates[chatID] = "awaiting_client_ticketType"
 		case "awaiting_client_ticketType":
