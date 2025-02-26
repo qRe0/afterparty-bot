@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -27,14 +28,24 @@ type MessagesHandler struct {
 	userStates map[int64]string
 	clientData map[int64]*models.ClientData
 	cfg        configs.AllowList
+	logger     *zap.Logger
 }
 
 func New(service *ticket_service.TicketsService, cfg configs.AllowList) MessagesHandler {
+	var lgr *zap.Logger
+	if os.Getenv("APP_ENV") == "dev" {
+		lgr = zap.Must(zap.NewDevelopment())
+	} else if os.Getenv("APP_ENV") == "prod" {
+		lgr = zap.Must(zap.NewProduction())
+	}
+	defer lgr.Sync()
+
 	return MessagesHandler{
 		service:    service,
 		userStates: make(map[int64]string),
 		clientData: make(map[int64]*models.ClientData),
 		cfg:        cfg,
+		logger:     lgr,
 	}
 }
 
@@ -50,7 +61,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			userId := strings.TrimPrefix(data, "confirm_yes_")
 			msg, err := mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
 			if err != nil {
-				mh.service.Logger.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (1st call) with error: ", zap.Error(err))
+				mh.logger.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (1st call) with error: ", zap.Error(err))
 				botMsg := tgbotapi.NewMessage(chatID, msg)
 				_, _ = bot.Send(botMsg)
 			}
@@ -63,7 +74,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			userId := data
 			msg, err := mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
 			if err != nil {
-				mh.service.Logger.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (2nd call) with error: ", zap.Error(err))
+				mh.logger.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (2nd call) with error: ", zap.Error(err))
 				botMsg := tgbotapi.NewMessage(chatID, msg)
 				_, _ = bot.Send(botMsg)
 			}
@@ -74,7 +85,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
 		_, err := bot.Request(callback)
 		if err != nil {
-			mh.service.Logger.Warn("HandleMessages:: Failed to send callback with error: ", zap.Error(err))
+			mh.logger.Warn("HandleMessages:: Failed to send callback with error: ", zap.Error(err))
 		}
 		return
 	}
@@ -124,7 +135,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			if _, err := strconv.Atoi(text); err == nil {
 				resp, respMsg, err := mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
 				if err != nil {
-					mh.service.Logger.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
+					mh.logger.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
 					botMsg := tgbotapi.NewMessage(chatID, respMsg)
 					_, _ = bot.Send(botMsg)
 				}
@@ -141,12 +152,12 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 					msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
 					_, _ = bot.Send(msg)
 				} else {
-					mh.service.Logger.Panic("HandleMessages:: SearchById:: Response is nil")
+					mh.logger.Panic("HandleMessages:: SearchById:: Response is nil")
 				}
 			} else {
 				respList, respMsg, err := mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
 				if err != nil {
-					mh.service.Logger.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
+					mh.logger.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
 					botMsg := tgbotapi.NewMessage(chatID, respMsg)
 					_, _ = bot.Send(botMsg)
 				}
