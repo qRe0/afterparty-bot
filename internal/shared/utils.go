@@ -37,12 +37,13 @@ func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string
 	failEmoji := "НЕТ ❌❌❌"
 
 	var laceColor string
+	ticketType := strings.ToLower(resp.TicketType)
 	switch {
-	case resp.TicketType == "ОРГ":
+	case ticketType == "орг":
 		laceColor = cfg.Org
-	case strings.HasPrefix(resp.TicketType, "ВИП"):
+	case strings.HasPrefix(ticketType, "вип"):
 		laceColor = cfg.VIP
-	case resp.TicketType == "БАЗОВЫЙ":
+	case ticketType == "базовый":
 		laceColor = cfg.Base
 	default:
 		return "Неизвестный тип билета"
@@ -161,8 +162,9 @@ func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, cli
 		return -1
 	}
 
+	ticketType := strings.ToLower(client.TicketType)
 	switch {
-	case client.TicketType == "БАЗОВЫЙ":
+	case ticketType == "базовый":
 		if timeNow.Before(dates[0]) {
 			if client.RepostExists {
 				return cfg.Prices[1]
@@ -176,7 +178,7 @@ func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, cli
 				return cfg.Prices[2]
 			}
 		}
-	case strings.HasPrefix(client.TicketType, "ВИП"):
+	case strings.HasPrefix(ticketType, "вип"):
 		return cfg.Prices[4]
 	}
 
