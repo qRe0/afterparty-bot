@@ -118,45 +118,36 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 	_, _ = bot.Send(msg)
 }
 
-func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) {
+func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (*models.TicketResponse, string, error) {
 	if userId == nil || *userId == "" {
-		msg := tgbotapi.NewMessage(*chatID, "service.SearchById: Предоставлен пустой номер билета (ID покупателя)")
-		_, _ = bot.Send(msg)
-		return
+		msg := "TicketService:: SearchById:: Предоставлен пустой ID пользователя"
+		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "userId")
 	}
+	ts.logger.Debug("TicketsService:: SearchById:: userId checked")
 
 	if chatID == nil {
-		msg := tgbotapi.NewMessage(-1, "service.SearchById: Предоставлен пустой ID чата")
-		_, _ = bot.Send(msg)
-		return
+		msg := "TicketService:: SearchById:: Предоставлен пустой ID чата"
+		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "chatId")
 	}
+	ts.logger.Debug("TicketsService:: SearchById:: chatId checked")
 
 	if bot == nil {
-		log.Fatalln("service.SearchById: Пустой инстанс бота")
+		ts.logger.Panic("TicketsService:: SearchById:: Bot instance is empty (nil)")
 	}
 
 	resp, err := ts.repo.SearchById(ctx, *userId)
 	if err != nil {
-		msg := tgbotapi.NewMessage(*chatID, "Нет покупателей с указанным номером билета")
-		_, _ = bot.Send(msg)
-		return
+		ts.logger.Warn("TicketService:: SearchById:: Repository method returned error", zap.Error(err))
+		msg := "TicketService:: SearchById:: Ошибка вызова метода репозитория SearchById"
+		return nil, msg, err
 	}
+	ts.logger.Info("TicketsService:: SearchById:: Repository method returned result successfully")
 
-	var result strings.Builder
-	result.WriteString("Найдены следующие покупатели:\n\n")
-	result.WriteString(utils.ResponseMapper(resp, ts.Cfg.LacesColor) + "\n\n")
+	var resultMsg strings.Builder
+	resultMsg.WriteString("Найдены следующие покупатели:\n\n")
+	resultMsg.WriteString(utils.ResponseMapper(resp, ts.Cfg.LacesColor) + "\n\n")
 
-	msg := tgbotapi.NewMessage(*chatID, result.String())
-	_, _ = bot.Send(msg)
-
-	var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
-	if resp.PassedControlZone == false {
-		btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
-		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
-	}
-	msg = tgbotapi.NewMessage(*chatID, "Выберите нужного покупателя, чтобы отметить вход:")
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
-	_, _ = bot.Send(msg)
+	return resp, resultMsg.String(), nil
 }
 
 func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (string, error) {

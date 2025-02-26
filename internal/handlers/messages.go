@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -15,7 +16,7 @@ import (
 
 type TicketsService interface {
 	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
-	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
+	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (*models.TicketResponse, string, error)
 	SellTicket(ctx context.Context, chatID int64, update tgbotapi.Update, bot *tgbotapi.BotAPI, client *models.ClientData) error
 	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (string, error)
 }
@@ -121,7 +122,27 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		case "awaiting_id_surname":
 			if _, err := strconv.Atoi(text); err == nil {
 				log.Println("messages.HandleMessages: Ищем пользователя по номеру билета")
-				mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
+				resp, respMsg, err := mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
+				if err != nil {
+					log.Println("HandleMessages:: SearchById:: Error during MarkAsEntered service method")
+					botMsg := tgbotapi.NewMessage(chatID, respMsg)
+					_, _ = bot.Send(botMsg)
+				}
+				msg := tgbotapi.NewMessage(chatID, respMsg)
+				_, _ = bot.Send(msg)
+
+				var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
+				if resp != nil {
+					if resp.PassedControlZone == false {
+						btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
+						inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
+					}
+					msg = tgbotapi.NewMessage(chatID, "Выберите нужного покупателя, чтобы отметить вход:")
+					msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
+					_, _ = bot.Send(msg)
+				} else {
+					log.Panic("HandleMessages:: SearchById:: Response is empty (nil)")
+				}
 			} else {
 				log.Println("messages.HandleMessages: Ищем пользователя по фамилии")
 				mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
