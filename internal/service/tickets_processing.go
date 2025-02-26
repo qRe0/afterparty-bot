@@ -57,45 +57,48 @@ func New(repo *ticket_repository.TicketsRepo, cfg configs.Config) *TicketsServic
 	}
 }
 
-func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI) {
+func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI) ([]models.TicketResponse, string, error) {
 	if surname == nil || *surname == "" {
-		msg := tgbotapi.NewMessage(*chatID, "service.SearchBySurname: Предоставлена пустая фамилия")
-		_, _ = bot.Send(msg)
-		return
+		msg := "TicketService:: SearchBySurname:: Предоставлена пустая фамилия пользователя"
+		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "surname")
 	}
+	ts.logger.Debug("TicketsService:: SearchBySurname:: surname checked")
 
 	if chatID == nil {
-		msg := tgbotapi.NewMessage(-1, "service.SearchBySurname: Предоставлен пустой ID чата")
-		_, _ = bot.Send(msg)
-		return
+		msg := "TicketService:: SearchBySurname:: Предоставлен пустая ID чата"
+		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "chatId")
 	}
+	ts.logger.Debug("TicketsService:: SearchBySurname:: chatId checked")
 
 	if bot == nil {
-		log.Fatalln("service.SearchBySurname: Пустой инстанс бота")
+		ts.logger.Panic("TicketsService:: SearchBySurname:: Bot instance is empty (nil)")
 	}
 
 	formattedSurname := strings.ToLower(*surname)
 	partSurnameToSearch := formattedSurname + "%"
 	respList, err := ts.repo.SearchBySurname(ctx, partSurnameToSearch)
 	if err != nil {
-		msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
-		_, _ = bot.Send(msg)
-		return
+		ts.logger.Warn("TicketService:: SearchBySurname_1:: Repository method returned error", zap.Error(err))
+		msg := "TicketService:: SearchBySurname:: Ошибка вызова метода репозитория SearchBySurname"
+		return nil, msg, err
 	}
 	if len(respList) == 0 {
+		ts.logger.Debug("TicketService:: SearchBySurname:: No clients found by part of surname")
+		ts.logger.Debug("TicketService:: SearchBySurname:: Trying to find client by full surname")
 		fullSurnameToSearch := formattedSurname
 		newRespList, err := ts.repo.SearchBySurname(ctx, fullSurnameToSearch)
 		if err != nil {
-			msg := tgbotapi.NewMessage(*chatID, "Ошибка при поиске покупателя")
-			_, _ = bot.Send(msg)
-			return
+			ts.logger.Warn("TicketService:: SearchBySurname_2:: Repository method returned error", zap.Error(err))
+			msg := "TicketService:: SearchBySurname:: Ошибка вызова метода репозитория SearchBySurname"
+			return nil, msg, err
 		}
 		if len(newRespList) == 0 {
-			msg := tgbotapi.NewMessage(*chatID, "Нет покупателей с указанной фамилией")
-			_, _ = bot.Send(msg)
-			return
+			ts.logger.Info("TicketService:: SearchBySurname:: No clients found with specified surname")
+			msg := "TicketService:: SearchBySurname:: Не удалось найти клиента с указанной фамилией"
+			return nil, msg, err
 		}
 	}
+	ts.logger.Info("TicketsService:: SearchBySurname:: Repository method returned result successfully")
 
 	var result strings.Builder
 	result.WriteString("Найдены следующие покупатели:\n\n")
@@ -103,19 +106,7 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 		result.WriteString(utils.ResponseMapper(&resp, ts.Cfg.LacesColor) + "\n\n")
 	}
 
-	msg := tgbotapi.NewMessage(*chatID, result.String())
-	_, _ = bot.Send(msg)
-
-	var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
-	for _, resp := range respList {
-		if resp.PassedControlZone == false {
-			btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
-			inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
-		}
-	}
-	msg = tgbotapi.NewMessage(*chatID, "Выберите нужного покупателя, чтобы отметить вход:")
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
-	_, _ = bot.Send(msg)
+	return respList, result.String(), nil
 }
 
 func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (*models.TicketResponse, string, error) {

@@ -121,7 +121,6 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		switch mh.userStates[chatID] {
 		case "awaiting_id_surname":
 			if _, err := strconv.Atoi(text); err == nil {
-				log.Println("messages.HandleMessages: Ищем пользователя по номеру билета")
 				resp, respMsg, err := mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
 				if err != nil {
 					log.Println("HandleMessages:: SearchById:: Error during MarkAsEntered service method")
@@ -144,8 +143,25 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 					log.Panic("HandleMessages:: SearchById:: Response is empty (nil)")
 				}
 			} else {
-				log.Println("messages.HandleMessages: Ищем пользователя по фамилии")
-				mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
+				respList, respMsg, err := mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
+				if err != nil {
+					log.Println("HandleMessages:: SearchById:: Error during MarkAsEntered service method")
+					botMsg := tgbotapi.NewMessage(chatID, respMsg)
+					_, _ = bot.Send(botMsg)
+				}
+				msg := tgbotapi.NewMessage(chatID, respMsg)
+				_, _ = bot.Send(msg)
+
+				var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
+				for _, resp := range respList {
+					if resp.PassedControlZone == false {
+						btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
+						inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
+					}
+				}
+				msg = tgbotapi.NewMessage(chatID, "Выберите нужного покупателя, чтобы отметить вход:")
+				msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
+				_, _ = bot.Send(msg)
 			}
 		case "awaiting_client_fio":
 			if text == "" {
