@@ -211,7 +211,7 @@ func (ts *TicketsService) SellTicket(
 	actualTicketPrice := utils.CalculateActualTicketPrice(time.Now(), ts.Cfg.SalesOption, *client)
 	sellerTag := update.Message.From.UserName
 	sellerId := update.Message.From.ID
-	client.TicketType = strings.ToLower(client.TicketType)
+	client.TicketType = strings.ToUpper(client.TicketType)
 	ts.logger.Debug("TicketsService:: SellTicket:: All the data prepared to call repository layer")
 
 	ts.logger.Debug("TicketsService:: SellTicket:: Calling repository method")
