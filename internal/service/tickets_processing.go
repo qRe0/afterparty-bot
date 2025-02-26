@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -41,7 +42,12 @@ type TicketsService struct {
 }
 
 func New(repo *ticket_repository.TicketsRepo, cfg configs.Config) *TicketsService {
-	lgr := zap.Must(zap.NewDevelopment())
+	var lgr *zap.Logger
+	if os.Getenv("APP_ENV") == "dev" {
+		lgr = zap.Must(zap.NewDevelopment())
+	} else if os.Getenv("APP_ENV") == "prod" {
+		lgr = zap.Must(zap.NewProduction())
+	}
 	defer lgr.Sync()
 
 	return &TicketsService{
