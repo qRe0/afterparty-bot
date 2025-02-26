@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	vipTicketTypeTemplate = "ВИП%d"
+	vipTicketTypeTemplate = "вип%d"
 	formattedFIOTemplate  = "%s %s %s"
 	formattedFITemplate   = "%s %s"
 )
@@ -58,8 +58,9 @@ func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string
 }
 
 func ValidateTicketType(ticketType string, cfg configs.SalesOptions) (string, bool) {
+	ticketType = strings.ToLower(ticketType)
 	allowedTicketTypes := make([]string, 0)
-	allowedTicketTypes = append(allowedTicketTypes, "БАЗОВЫЙ")
+	allowedTicketTypes = append(allowedTicketTypes, "базовый")
 	for i := 0; i < cfg.VIPTablesCount; i++ {
 		allowedTicketTypes = append(allowedTicketTypes, fmt.Sprintf(vipTicketTypeTemplate, i+1))
 	}
@@ -121,11 +122,9 @@ func CheckRepost(msg string) bool {
 
 	if keyWord == "да" {
 		return true
-	} else if keyWord == "нет" {
+	} else {
 		return false
 	}
-
-	return false
 }
 
 func convertStringsToDates(dates []string) ([]time.Time, error) {

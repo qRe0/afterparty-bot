@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -15,9 +16,9 @@ import (
 )
 
 type TicketsService interface {
-	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
+	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI) ([]models.TicketResponse, string, error)
 	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (*models.TicketResponse, string, error)
-	SellTicket(ctx context.Context, chatID int64, update tgbotapi.Update, bot *tgbotapi.BotAPI, client *models.ClientData) error
+	SellTicket(ctx context.Context, update tgbotapi.Update, bot *tgbotapi.BotAPI, client *models.ClientData) (string, *bytes.Buffer, bool, error)
 	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (string, error)
 }
 
@@ -225,9 +226,26 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 			mh.clientData[chatID].RepostExists = utils.CheckRepost(text)
 
-			err := mh.service.SellTicket(ctx, chatID, update, bot, mh.clientData[chatID])
+			msg := tgbotapi.NewMessage(chatID, "Операция обрабатывается...")
+			_, _ = bot.Send(msg)
+
+			respMsg, imgBuffer, ticketGenerated, err := mh.service.SellTicket(ctx, update, bot, mh.clientData[chatID])
 			if err != nil {
-				log.Printf("Ошибка при продаже билета: %v", err)
+				msg := tgbotapi.NewMessage(chatID, respMsg)
+				_, _ = bot.Send(msg)
+				return
+			}
+
+			if imgBuffer != nil && ticketGenerated {
+				photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileBytes{
+					Name:  "ticket.png",
+					Bytes: imgBuffer.Bytes(),
+				})
+				photoMsg.Caption = respMsg
+				_, _ = bot.Send(photoMsg)
+			} else {
+				msg := tgbotapi.NewMessage(chatID, "Не удалось оптравить изображение")
+				_, _ = bot.Send(msg)
 			}
 
 			mh.userStates[chatID] = ""

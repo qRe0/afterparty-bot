@@ -172,17 +172,18 @@ func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, cha
 
 func (ts *TicketsService) SellTicket(
 	ctx context.Context,
-	chatID int64,
 	update tgbotapi.Update,
 	bot *tgbotapi.BotAPI,
 	client *models.ClientData,
-) error {
+) (string, *bytes.Buffer, bool, error) {
 	if client == nil {
-		return fmt.Errorf("SellTicket: client is nil")
+		msg := "TicketService:: SellTicket:: Данные клиента не были предоставлены"
+		return msg, nil, false, errors.Wrap(errs.ErrCheckingBaseParameters, "client")
 	}
+	ts.logger.Debug("TicketsService:: SellTicket:: client checked")
 
 	if bot == nil {
-		return fmt.Errorf("SellTicket: bot is nil")
+		ts.logger.Panic("TicketsService:: SellTicket:: Bot instance is empty (nil)")
 	}
 
 	clientSurname := utils.GetSurnameLowercase(client.FIO)
@@ -194,47 +195,43 @@ func (ts *TicketsService) SellTicket(
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
-			msg := tgbotapi.NewMessage(chatID, "Данный покупатель уже купил билет")
-			_, _ = bot.Send(msg)
-			return err
+			ts.logger.Info("TicketService:: SellTicket:: This client already bought a ticket")
+			msg := "TicketService:: SellTicket:: Данный клиент уже купил билет"
+			return msg, nil, false, err
 		}
-		msg := tgbotapi.NewMessage(chatID, "Не удалось выполнить продажу билета. Попробуйте еще раз")
-		_, _ = bot.Send(msg)
-		return err
+		ts.logger.Warn("TicketService:: SellTicket:: Repository method returned error", zap.Error(err))
+		msg := "TicketService:: SellTicket:: Ошибка вызова метода репозитория SellTicket"
+		return msg, nil, false, err
 	}
-
-	msgTmpl := fmt.Sprintf("Билет успешно продан!\nФИО покупателя: %s, номер билета: %d", client.FIO, ticketNo)
-	msg := tgbotapi.NewMessage(chatID, msgTmpl)
-	_, _ = bot.Send(msg)
 
 	err = ts.repo.UpdateSellersTable(ctx, ticketNo, sellerId, "@"+sellerTag)
 	if err != nil {
-		log.Println("Не удалось обновить базу данных продавцов информацией о последней транзакции:", err)
+		ts.logger.Warn("TicketService:: SellTicket:: Can't update sellers table with error: ", zap.Error(err))
 	}
 
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	if err := ts.addRowToGoogleSheet(*client, sellerTag, ticketNo); err != nil {
-		log.Printf("Не удалось добавить данные в Google Таблицу: %v", err)
+	err = ts.addRowToGoogleSheet(*client, sellerTag, ticketNo)
+	if err != nil {
+		ts.logger.Warn("TicketService:: SellTicket:: Can't update Google Sheet with error: ", zap.Error(err))
+		msgTmpl := "TicketService:: SellTicket:: Не удалось записать данные в гугл таблицу. Напишите @yahor_malinouski номер билета (%v), который не был записан в гугл таблицу и сгенерируйте билет вручную через Canva"
+		msg := fmt.Sprintf(msgTmpl, ticketNo)
+		return msg, nil, false, err
 	}
 
+	ticketGenerated := true
 	imageBuffer, err := ts.generateTicketImage(ticketNo)
 	if err != nil {
-		log.Println("Ошибка при генерации изображения")
-		return nil
+		ticketGenerated = false
+		ts.logger.Warn("TicketService:: SellTicket:: Can't generate ticket image with error: ", zap.Error(err))
+		msgTmpl := "TicketService:: SellTicket:: Не удалось сгенерировать изображение билета. Cгенерируйте билет вручную через Canva (номер билета: %v)"
+		msg := fmt.Sprintf(msgTmpl, ticketNo)
+		return msg, nil, ticketGenerated, err
 	}
 
-	photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileBytes{
-		Name:  "ticket.png",
-		Bytes: imageBuffer.Bytes(),
-	})
-	photoMsg.Caption = fmt.Sprintf("Покупатель: %s\nНомер билета: %d", client.FIO, ticketNo)
-	if _, err = bot.Send(photoMsg); err != nil {
-		log.Println("Ошибка при отправке фото")
-	}
-
-	return nil
+	msg := fmt.Sprintf("Билет успешно продан!\nФИО покупателя: %s\nНомер билета: %d", client.FIO, ticketNo)
+	return msg, imageBuffer, ticketGenerated, nil
 }
 
 func (ts *TicketsService) addRowToGoogleSheet(client models.ClientData, sellerTag string, ticketNo int64) error {
