@@ -88,7 +88,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		case "/start":
 			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) && !utils.UserInList(userName, mh.cfg.AllowedSellers) {
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав на использование бота.")
-				bot.Send(msg)
+				_, _ = bot.Send(msg)
 				return
 			}
 			mh.userStates[chatID] = ""
@@ -98,7 +98,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		case "Отметить вход":
 			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) {
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для отметки входа.")
-				bot.Send(msg)
+				_, _ = bot.Send(msg)
 				return
 			}
 			mh.userStates[chatID] = "awaiting_id_surname"
@@ -109,7 +109,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		case "Продать билет":
 			if !utils.UserInList(userName, mh.cfg.AllowedSellers) {
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для продажи билетов.")
-				bot.Send(msg)
+				_, _ = bot.Send(msg)
 				return
 			}
 			mh.clientData[chatID] = &models.ClientData{}
