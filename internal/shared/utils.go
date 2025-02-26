@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -199,7 +198,6 @@ func GetSurnameLowercase(surname string) string {
 func UserInList(userName string, list map[string]bool) bool {
 	_, ok := list[userName]
 	if !ok {
-		log.Println("Unknown user is trying to use bot")
 		return false
 	}
 	return true

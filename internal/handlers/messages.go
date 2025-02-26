@@ -98,6 +98,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		switch text {
 		case "/start":
 			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) && !utils.UserInList(userName, mh.cfg.AllowedSellers) {
+				mh.logger.Info("Unauthorized user trying to use bot")
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав на использование бота.")
 				_, _ = bot.Send(msg)
 				return
@@ -108,6 +109,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		case "Отметить вход":
 			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) {
+				mh.logger.Info("Unauthorized user trying to use bot")
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для отметки входа.")
 				_, _ = bot.Send(msg)
 				return
@@ -119,6 +121,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		case "Продать билет":
 			if !utils.UserInList(userName, mh.cfg.AllowedSellers) {
+				mh.logger.Info("Unauthorized user trying to use bot")
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для продажи билетов.")
 				_, _ = bot.Send(msg)
 				return
