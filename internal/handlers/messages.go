@@ -17,7 +17,7 @@ type TicketsService interface {
 	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
 	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
 	SellTicket(ctx context.Context, chatID int64, update tgbotapi.Update, bot *tgbotapi.BotAPI, client *models.ClientData) error
-	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
+	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (string, error)
 }
 
 type MessagesHandler struct {
@@ -46,18 +46,33 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		if strings.HasPrefix(data, "confirm_yes_") {
 			userId := strings.TrimPrefix(data, "confirm_yes_")
-			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+			msg, err := mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+			if err != nil {
+				log.Println("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (1st call)")
+				botMsg := tgbotapi.NewMessage(chatID, msg)
+				_, _ = bot.Send(botMsg)
+			}
+			botMsg := tgbotapi.NewMessage(chatID, msg)
+			_, _ = bot.Send(botMsg)
 		} else if strings.HasPrefix(data, "confirm_no_") {
 			msg := tgbotapi.NewMessage(chatID, "Операция отменена.")
 			_, _ = bot.Send(msg)
 		} else {
 			userId := data
-			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+			msg, err := mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+			if err != nil {
+				log.Println("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (2nd call)")
+				botMsg := tgbotapi.NewMessage(chatID, msg)
+				_, _ = bot.Send(botMsg)
+			}
+			botMsg := tgbotapi.NewMessage(chatID, msg)
+			_, _ = bot.Send(botMsg)
 		}
 
 		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
-		if _, err := bot.Request(callback); err != nil {
-			log.Printf("Ошибка при отправке Callback: %v", err)
+		_, err := bot.Request(callback)
+		if err != nil {
+			log.Printf("HandleMessages:: Failed to send callback with error: %v", err)
 		}
 		return
 	}

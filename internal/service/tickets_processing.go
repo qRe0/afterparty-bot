@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,10 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
 	"github.com/fogleman/gg"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/lib/pq"
 	"github.com/qRe0/afterparty-bot/internal/configs"
+	errs "github.com/qRe0/afterparty-bot/internal/errors"
 	"github.com/qRe0/afterparty-bot/internal/models"
 	"github.com/qRe0/afterparty-bot/internal/repository"
 	"github.com/qRe0/afterparty-bot/internal/shared"
@@ -31,15 +34,20 @@ type TicketsRepo interface {
 }
 
 type TicketsService struct {
-	repo *ticket_repository.TicketsRepo
-	Cfg  configs.Config
-	mu   sync.Mutex
+	repo   *ticket_repository.TicketsRepo
+	Cfg    configs.Config
+	mu     sync.Mutex
+	logger *zap.Logger
 }
 
 func New(repo *ticket_repository.TicketsRepo, cfg configs.Config) *TicketsService {
+	lgr := zap.Must(zap.NewDevelopment())
+	defer lgr.Sync()
+
 	return &TicketsService{
-		repo: repo,
-		Cfg:  cfg,
+		repo:   repo,
+		Cfg:    cfg,
+		logger: lgr,
 	}
 }
 
@@ -145,33 +153,33 @@ func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID
 	_, _ = bot.Send(msg)
 }
 
-func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) {
+func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (string, error) {
 	if userId == nil || *userId == "" {
-		msg := tgbotapi.NewMessage(*chatID, "service.MarkAsEntered: Предоставлен пустой ID")
-		_, _ = bot.Send(msg)
-		return
+		msg := "TicketService:: MarkAsEntered:: Предоставлен пустой ID пользователя"
+		return msg, errors.Wrap(errs.ErrCheckingBaseParameters, "userId")
 	}
+	ts.logger.Debug("TicketsService:: MarkAsEntered:: userId checked")
 
 	if chatID == nil {
-		msg := tgbotapi.NewMessage(-1, "service.MarkAsEntered: Предоставлен пустой ID чата")
-		_, _ = bot.Send(msg)
-		return
+		msg := "TicketService:: MarkAsEntered:: Предоставлен пустой ID чата"
+		return msg, errors.Wrap(errs.ErrCheckingBaseParameters, "chatID")
 	}
+	ts.logger.Debug("TicketsService:: MarkAsEntered:: chatId checked")
 
 	if bot == nil {
-		log.Fatalln("service.MarkAsEntered: Пустой инстанс бота")
+		ts.logger.Panic("TicketsService:: MarkAsEntered:: Bot instance is empty (nil)")
 	}
 
 	resp, err := ts.repo.MarkAsEntered(ctx, *userId)
 	if err != nil || resp == nil {
-		msg := tgbotapi.NewMessage(*chatID, "Покупатель с данным ID не найден")
-		_, _ = bot.Send(msg)
-		return
+		ts.logger.Warn("TicketService:: MarkAsEntered:: Repository method returned error", zap.Error(err))
+		msg := "TicketService:: MarkAsEntered:: Ошибка вызова метода репозитория MarkAsEntered"
+		return msg, err
 	}
+	ts.logger.Info("TicketsService:: MarkAsEntered:: Repository method returned result successfully")
 
 	mappedResp := fmt.Sprintf("%s прошел контроль (ID: %s)", resp.Name, resp.Id)
-	msg := tgbotapi.NewMessage(*chatID, mappedResp)
-	_, _ = bot.Send(msg)
+	return mappedResp, nil
 }
 
 func (ts *TicketsService) SellTicket(

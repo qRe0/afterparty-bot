@@ -145,7 +145,7 @@ func convertStringsToDates(dates []string) ([]time.Time, error) {
 	return result, nil
 }
 
-// prices = {20,15,25,20,30} ->
+// prices = {20,17,25,22,30} ->
 // prices[0] - цена без репоста до повышения
 // prices[1] - цена с репостом до повышения
 // prices[2] - цена без репоста после повышения
