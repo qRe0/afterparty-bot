@@ -15,10 +15,8 @@ import (
 )
 
 func Run() error {
-	var logger *zap.Logger
-	if os.Getenv("APP_ENV") == "dev" {
-		logger = zap.Must(zap.NewDevelopment())
-	} else if os.Getenv("APP_ENV") == "prod" {
+	logger := zap.Must(zap.NewDevelopment())
+	if os.Getenv("APP_ENV") == "prod" {
 		logger = zap.Must(zap.NewProduction())
 	}
 	defer logger.Sync()
