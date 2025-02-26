@@ -57,6 +57,8 @@ func New(repo *ticket_repository.TicketsRepo, cfg configs.Config) *TicketsServic
 }
 
 func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI) ([]models.TicketResponse, string, error) {
+	ts.Logger.Info("TicketService:: Started SearchBySurname method call")
+
 	if surname == nil || *surname == "" {
 		msg := "TicketService:: SearchBySurname:: Предоставлена пустая фамилия пользователя"
 		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "surname")
@@ -105,10 +107,14 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 		result.WriteString(utils.ResponseMapper(&resp, ts.Cfg.LacesColor) + "\n\n")
 	}
 
+	ts.Logger.Info("TicketsService:: Finished SearchBySurname method call")
+
 	return respList, result.String(), nil
 }
 
 func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (*models.TicketResponse, string, error) {
+	ts.Logger.Info("TicketService:: Started SearchById method call")
+
 	if userId == nil || *userId == "" {
 		msg := "TicketService:: SearchById:: Предоставлен пустой ID пользователя"
 		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "userId")
@@ -137,10 +143,14 @@ func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID
 	resultMsg.WriteString("Найдены следующие покупатели:\n\n")
 	resultMsg.WriteString(utils.ResponseMapper(resp, ts.Cfg.LacesColor) + "\n\n")
 
+	ts.Logger.Info("TicketsService:: Finished SearchById method call")
+
 	return resp, resultMsg.String(), nil
 }
 
 func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (string, error) {
+	ts.Logger.Info("TicketService:: Started MarkAsEntered method call")
+
 	if userId == nil || *userId == "" {
 		msg := "TicketService:: MarkAsEntered:: Предоставлен пустой ID пользователя"
 		return msg, errors.Wrap(errs.ErrCheckingBaseParameters, "userId")
@@ -165,6 +175,8 @@ func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, cha
 	}
 	ts.Logger.Info("TicketsService:: MarkAsEntered:: Repository method returned result successfully")
 
+	ts.Logger.Info("TicketsService:: Finished MarkAsEntered method call")
+
 	mappedResp := fmt.Sprintf("%s прошел контроль (ID: %s)", resp.Name, resp.Id)
 	return mappedResp, nil
 }
@@ -175,6 +187,8 @@ func (ts *TicketsService) SellTicket(
 	bot *tgbotapi.BotAPI,
 	client *models.ClientData,
 ) (string, *bytes.Buffer, bool, error) {
+	ts.Logger.Info("TicketService:: Started SellTicket method call")
+
 	if client == nil {
 		msg := "TicketService:: SellTicket:: Данные клиента не были предоставлены"
 		return msg, nil, false, errors.Wrap(errs.ErrCheckingBaseParameters, "client")
@@ -238,6 +252,8 @@ func (ts *TicketsService) SellTicket(
 		return msg, nil, ticketGenerated, err
 	}
 	ts.Logger.Info("TicketsService:: SellTicket:: Ticket image generated successfully")
+
+	ts.Logger.Info("TicketsService:: Finished SellTicket method call")
 
 	msg := fmt.Sprintf("Билет успешно продан!\nФИО покупателя: %s\nНомер билета: %d", client.FIO, ticketNo)
 	return msg, imageBuffer, ticketGenerated, nil
