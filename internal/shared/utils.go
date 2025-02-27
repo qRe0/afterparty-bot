@@ -95,7 +95,20 @@ func ParseTicketPrice(input string) (int, error) {
 		return 0, fmt.Errorf("failed to parse string to int %q: %v", match, err)
 	}
 
-	return value, nil
+	switch value {
+	case 17:
+		return 17, nil
+	case 20:
+		return 20, nil
+	case 22:
+		return 22, nil
+	case 25:
+		return 25, nil
+	case 30:
+		return 30, nil
+	default:
+		return -1, fmt.Errorf("failed to parse ticket price. wrong value")
+	}
 }
 
 func FormatFIO(fio string) (string, error) {
@@ -112,17 +125,14 @@ func FormatFIO(fio string) (string, error) {
 }
 
 func CheckRepost(msg string) bool {
-	formattedInput := strings.ToLower(msg)
+	keyWord := strings.ToLower(msg)
 
-	parts := strings.Fields(formattedInput)
-	if len(parts) != 1 {
-		return false
-	}
-	keyWord := parts[0]
-
-	if keyWord == "да" {
+	switch keyWord {
+	case "да":
 		return true
-	} else {
+	case "нет":
+		return false
+	default:
 		return false
 	}
 }
