@@ -44,11 +44,13 @@ type SalesOptions struct {
 type tempAllowList struct {
 	AllowedSellers  []string `env:"ALLOWED_SELLERS"  envSeparator:","`
 	AllowedCheckers []string `env:"ALLOWED_CHECKERS" envSeparator:","`
+	VIPSeller       string   `env:"VIP_SELLER"`
 }
 
 type AllowList struct {
 	AllowedSellers  map[string]bool
 	AllowedCheckers map[string]bool
+	VIPSeller       string `env:"VIP_SELLER"`
 }
 
 type Config struct {
@@ -124,6 +126,7 @@ func LoadEnvs() (*Config, error) {
 		AllowList: AllowList{
 			AllowedSellers:  allowedSellersMap,
 			AllowedCheckers: allowedCheckersMap,
+			VIPSeller:       tmpAllowList.VIPSeller,
 		},
 	}
 

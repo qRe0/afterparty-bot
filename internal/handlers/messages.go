@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
-	"log"
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -11,13 +13,14 @@ import (
 	"github.com/qRe0/afterparty-bot/internal/models"
 	"github.com/qRe0/afterparty-bot/internal/service"
 	utils "github.com/qRe0/afterparty-bot/internal/shared"
+	"go.uber.org/zap"
 )
 
 type TicketsService interface {
-	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI)
-	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
-	SellTicket(ctx context.Context, chatID int64, update tgbotapi.Update, bot *tgbotapi.BotAPI, client *models.ClientData) error
-	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI)
+	SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI) ([]models.TicketResponse, string, error)
+	SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (*models.TicketResponse, string, error)
+	SellTicket(ctx context.Context, update tgbotapi.Update, bot *tgbotapi.BotAPI, client *models.ClientData) (string, *bytes.Buffer, bool, error)
+	MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (string, error)
 }
 
 type MessagesHandler struct {
@@ -25,14 +28,24 @@ type MessagesHandler struct {
 	userStates map[int64]string
 	clientData map[int64]*models.ClientData
 	cfg        configs.AllowList
+	logger     *zap.Logger
 }
 
 func New(service *ticket_service.TicketsService, cfg configs.AllowList) MessagesHandler {
+	var lgr *zap.Logger
+	if os.Getenv("APP_ENV") == "dev" {
+		lgr = zap.Must(zap.NewDevelopment())
+	} else if os.Getenv("APP_ENV") == "prod" {
+		lgr = zap.Must(zap.NewProduction())
+	}
+	defer lgr.Sync()
+
 	return MessagesHandler{
 		service:    service,
 		userStates: make(map[int64]string),
 		clientData: make(map[int64]*models.ClientData),
 		cfg:        cfg,
+		logger:     lgr,
 	}
 }
 
@@ -46,18 +59,33 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		if strings.HasPrefix(data, "confirm_yes_") {
 			userId := strings.TrimPrefix(data, "confirm_yes_")
-			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+			msg, err := mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+			if err != nil {
+				mh.logger.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (1st call) with error: ", zap.Error(err))
+				botMsg := tgbotapi.NewMessage(chatID, msg)
+				_, _ = bot.Send(botMsg)
+			}
+			botMsg := tgbotapi.NewMessage(chatID, msg)
+			_, _ = bot.Send(botMsg)
 		} else if strings.HasPrefix(data, "confirm_no_") {
 			msg := tgbotapi.NewMessage(chatID, "Операция отменена.")
 			_, _ = bot.Send(msg)
 		} else {
 			userId := data
-			mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+			msg, err := mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
+			if err != nil {
+				mh.logger.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (2nd call) with error: ", zap.Error(err))
+				botMsg := tgbotapi.NewMessage(chatID, msg)
+				_, _ = bot.Send(botMsg)
+			}
+			botMsg := tgbotapi.NewMessage(chatID, msg)
+			_, _ = bot.Send(botMsg)
 		}
 
 		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
-		if _, err := bot.Request(callback); err != nil {
-			log.Printf("Ошибка при отправке Callback: %v", err)
+		_, err := bot.Request(callback)
+		if err != nil {
+			mh.logger.Warn("HandleMessages:: Failed to send callback with error: ", zap.Error(err))
 		}
 		return
 	}
@@ -70,18 +98,20 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		switch text {
 		case "/start":
 			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) && !utils.UserInList(userName, mh.cfg.AllowedSellers) {
+				mh.logger.Info("Unauthorized user trying to use bot")
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав на использование бота.")
-				bot.Send(msg)
+				_, _ = bot.Send(msg)
 				return
 			}
 			mh.userStates[chatID] = ""
-			utils.ShowOptions(chatID, bot)
+			utils.ShowOptions(chatID, bot, userName, mh.cfg)
 			return
 
 		case "Отметить вход":
 			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) {
+				mh.logger.Info("Unauthorized user trying to use bot")
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для отметки входа.")
-				bot.Send(msg)
+				_, _ = bot.Send(msg)
 				return
 			}
 			mh.userStates[chatID] = "awaiting_id_surname"
@@ -91,8 +121,9 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		case "Продать билет":
 			if !utils.UserInList(userName, mh.cfg.AllowedSellers) {
+				mh.logger.Info("Unauthorized user trying to use bot")
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для продажи билетов.")
-				bot.Send(msg)
+				_, _ = bot.Send(msg)
 				return
 			}
 			mh.clientData[chatID] = &models.ClientData{}
@@ -105,11 +136,47 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		switch mh.userStates[chatID] {
 		case "awaiting_id_surname":
 			if _, err := strconv.Atoi(text); err == nil {
-				log.Println("messages.HandleMessages: Ищем пользователя по номеру билета")
-				mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
+				resp, respMsg, err := mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
+				if err != nil {
+					mh.logger.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
+					botMsg := tgbotapi.NewMessage(chatID, respMsg)
+					_, _ = bot.Send(botMsg)
+				}
+				msg := tgbotapi.NewMessage(chatID, respMsg)
+				_, _ = bot.Send(msg)
+
+				var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
+				if resp != nil {
+					if !resp.PassedControlZone {
+						btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
+						inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
+					}
+					msg = tgbotapi.NewMessage(chatID, "Выберите нужного покупателя, чтобы отметить вход:")
+					msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
+					_, _ = bot.Send(msg)
+				} else {
+					mh.logger.Panic("HandleMessages:: SearchById:: Response is nil")
+				}
 			} else {
-				log.Println("messages.HandleMessages: Ищем пользователя по фамилии")
-				mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
+				respList, respMsg, err := mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
+				if err != nil {
+					mh.logger.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
+					botMsg := tgbotapi.NewMessage(chatID, respMsg)
+					_, _ = bot.Send(botMsg)
+				}
+				msg := tgbotapi.NewMessage(chatID, respMsg)
+				_, _ = bot.Send(msg)
+
+				var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
+				for _, resp := range respList {
+					if !resp.PassedControlZone {
+						btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
+						inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
+					}
+				}
+				msg = tgbotapi.NewMessage(chatID, "Выберите нужного покупателя, чтобы отметить вход:")
+				msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
+				_, _ = bot.Send(msg)
 			}
 		case "awaiting_client_fio":
 			if text == "" {
@@ -124,19 +191,65 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				return
 			}
 			mh.clientData[chatID].FIO = formattedFio
-			msg := tgbotapi.NewMessage(chatID, "Введите тип билета (ВИПх или БАЗОВЫЙ):")
+
+			baseButton := tgbotapi.NewKeyboardButton("Базовый")
+			vipButton := tgbotapi.NewKeyboardButton("ВИП")
+			var replyKeyboard tgbotapi.ReplyKeyboardMarkup
+
+			if userName == mh.cfg.VIPSeller {
+				replyKeyboard = tgbotapi.NewReplyKeyboard(
+					tgbotapi.NewKeyboardButtonRow(baseButton, vipButton),
+				)
+			} else {
+				replyKeyboard = tgbotapi.NewReplyKeyboard(
+					tgbotapi.NewKeyboardButtonRow(baseButton),
+				)
+			}
+			replyKeyboard.OneTimeKeyboard = true
+			replyKeyboard.ResizeKeyboard = true
+
+			msg := tgbotapi.NewMessage(chatID, "Выберите тип билета:")
+			msg.ReplyMarkup = replyKeyboard
 			_, _ = bot.Send(msg)
-			mh.userStates[chatID] = "awaiting_client_ticketType"
-		case "awaiting_client_ticketType":
-			if text == "" {
-				msg := tgbotapi.NewMessage(chatID, "Введите тип билета:")
+
+			mh.userStates[chatID] = "awaiting_client_ticket_type_choice"
+
+		case "awaiting_client_ticket_type_choice":
+			removeKeyboard := tgbotapi.NewRemoveKeyboard(true)
+
+			if strings.ToLower(text) == "базовый" {
+				mh.clientData[chatID].TicketType = "Базовый"
+
+				removeMsg := tgbotapi.NewMessage(chatID, "Выбран тип: Базовый.")
+				removeMsg.ReplyMarkup = removeKeyboard
+				_, _ = bot.Send(removeMsg)
+
+				msg := tgbotapi.NewMessage(chatID, "Введите стоимость билета:")
+				_, _ = bot.Send(msg)
+				mh.userStates[chatID] = "awaiting_client_price"
+			} else if strings.ToLower(text) == "вип" {
+				removeMsg := tgbotapi.NewMessage(chatID, "Выбран тип: ВИП. Введите номер столика:")
+				removeMsg.ReplyMarkup = removeKeyboard
+				_, _ = bot.Send(removeMsg)
+
+				mh.userStates[chatID] = "awaiting_vip_table_number"
+			} else {
+				msg := tgbotapi.NewMessage(chatID, "Неверный выбор. Нажмите «Базовый» или «ВИП».")
+				_, _ = bot.Send(msg)
+			}
+		case "awaiting_vip_table_number":
+			tableNumber := text
+			if tableNumber == "" {
+				msg := tgbotapi.NewMessage(chatID, "Номер столика не может быть пустым. Введите ещё раз:")
 				_, _ = bot.Send(msg)
 				return
 			}
 
-			ticketType, ok := utils.ValidateTicketType(text, mh.service.Cfg.SalesOption)
+			vipType := "ВИП" + tableNumber
+
+			ticketType, ok := utils.ValidateTicketType(vipType, mh.service.Cfg.SalesOption)
 			if !ok {
-				msg := tgbotapi.NewMessage(chatID, "Неверный тип билета. Попробуйте ещё раз:")
+				msg := tgbotapi.NewMessage(chatID, "Неверный тип (возможно неправильный формат стола). Попробуйте ещё раз:")
 				_, _ = bot.Send(msg)
 				return
 			}
@@ -160,26 +273,59 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			}
 			mh.clientData[chatID].Price = price
 
-			msg := tgbotapi.NewMessage(chatID, "Укажите наличие репоста (да/нет):")
+			yesButton := tgbotapi.NewKeyboardButton("Да")
+			noButton := tgbotapi.NewKeyboardButton("Нет")
+			replyKeyboard := tgbotapi.NewReplyKeyboard(
+				tgbotapi.NewKeyboardButtonRow(yesButton, noButton),
+			)
+			replyKeyboard.OneTimeKeyboard = true
+			replyKeyboard.ResizeKeyboard = true
+
+			msg := tgbotapi.NewMessage(chatID, "Укажите наличие репоста:")
+			msg.ReplyMarkup = replyKeyboard
 			_, _ = bot.Send(msg)
 			mh.userStates[chatID] = "awaiting_client_repost"
 
 		case "awaiting_client_repost":
 			if text == "" {
-				msg := tgbotapi.NewMessage(chatID, "Ответ не может быть пустым. Укажите наличие репоста (да/нет):")
+				msg := tgbotapi.NewMessage(chatID, "Ответ не может быть пустым. Укажите наличие репоста (Да/Нет):")
 				_, _ = bot.Send(msg)
 				return
 			}
 
+			removeKeyboard := tgbotapi.NewRemoveKeyboard(true)
+			removeMsg := tgbotapi.NewMessage(chatID, "Ответ получен.")
+			removeMsg.ReplyMarkup = removeKeyboard
+			_, _ = bot.Send(removeMsg)
+
 			mh.clientData[chatID].RepostExists = utils.CheckRepost(text)
 
-			err := mh.service.SellTicket(ctx, chatID, update, bot, mh.clientData[chatID])
+			msg := tgbotapi.NewMessage(chatID, "Операция обрабатывается...")
+			_, _ = bot.Send(msg)
+
+			respMsg, imgBuffer, ticketGenerated, err := mh.service.SellTicket(ctx, update, bot, mh.clientData[chatID])
 			if err != nil {
-				log.Printf("Ошибка при продаже билета: %v", err)
+				msg := tgbotapi.NewMessage(chatID, respMsg)
+				_, _ = bot.Send(msg)
+				return
+			}
+
+			if imgBuffer != nil && ticketGenerated {
+				photoMsg := tgbotapi.NewPhoto(chatID, tgbotapi.FileBytes{
+					Name:  "ticket.png",
+					Bytes: imgBuffer.Bytes(),
+				})
+				photoMsg.Caption = respMsg
+				_, _ = bot.Send(photoMsg)
+			} else {
+				msg := tgbotapi.NewMessage(chatID, "Не удалось отправить изображение")
+				_, _ = bot.Send(msg)
 			}
 
 			mh.userStates[chatID] = ""
 			delete(mh.clientData, chatID)
+
+			utils.ShowOptions(chatID, bot, userName, mh.cfg)
 		}
 	}
 }

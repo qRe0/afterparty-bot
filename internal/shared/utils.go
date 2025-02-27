@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,19 +13,31 @@ import (
 )
 
 const (
-	vipTicketTypeTemplate = "ВИП%d"
+	vipTicketTypeTemplate = "вип%d"
 	formattedFIOTemplate  = "%s %s %s"
 	formattedFITemplate   = "%s %s"
 )
 
-func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
+func ShowOptions(chatID int64, bot *tgbotapi.BotAPI, userName string, cfg configs.AllowList) {
 	msg := tgbotapi.NewMessage(chatID, "Выберите опцию:")
-	keyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Отметить вход"),
-			tgbotapi.NewKeyboardButton("Продать билет"),
-		),
-	)
+
+	checker := UserInList(userName, cfg.AllowedCheckers)
+	seller := UserInList(userName, cfg.AllowedSellers)
+
+	var keyboard tgbotapi.ReplyKeyboardMarkup
+	var row []tgbotapi.KeyboardButton
+
+	if checker {
+		row = append(row, tgbotapi.NewKeyboardButton("Отметить вход"))
+	}
+
+	if seller {
+		row = append(row, tgbotapi.NewKeyboardButton("Продать билет"))
+	}
+
+	if len(row) > 0 {
+		keyboard = tgbotapi.NewReplyKeyboard(row)
+	}
 
 	msg.ReplyMarkup = keyboard
 	_, _ = bot.Send(msg)
@@ -37,12 +48,13 @@ func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string
 	failEmoji := "НЕТ ❌❌❌"
 
 	var laceColor string
+	ticketType := strings.ToLower(resp.TicketType)
 	switch {
-	case resp.TicketType == "ОРГ":
+	case ticketType == "орг":
 		laceColor = cfg.Org
-	case strings.HasPrefix(resp.TicketType, "ВИП"):
+	case strings.HasPrefix(ticketType, "вип"):
 		laceColor = cfg.VIP
-	case resp.TicketType == "БАЗОВЫЙ":
+	case ticketType == "базовый":
 		laceColor = cfg.Base
 	default:
 		return "Неизвестный тип билета"
@@ -58,8 +70,9 @@ func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string
 }
 
 func ValidateTicketType(ticketType string, cfg configs.SalesOptions) (string, bool) {
+	ticketType = strings.ToLower(ticketType)
 	allowedTicketTypes := make([]string, 0)
-	allowedTicketTypes = append(allowedTicketTypes, "БАЗОВЫЙ")
+	allowedTicketTypes = append(allowedTicketTypes, "базовый")
 	for i := 0; i < cfg.VIPTablesCount; i++ {
 		allowedTicketTypes = append(allowedTicketTypes, fmt.Sprintf(vipTicketTypeTemplate, i+1))
 	}
@@ -94,7 +107,20 @@ func ParseTicketPrice(input string) (int, error) {
 		return 0, fmt.Errorf("failed to parse string to int %q: %v", match, err)
 	}
 
-	return value, nil
+	switch value {
+	case 17:
+		return 17, nil
+	case 20:
+		return 20, nil
+	case 22:
+		return 22, nil
+	case 25:
+		return 25, nil
+	case 30:
+		return 30, nil
+	default:
+		return -1, fmt.Errorf("failed to parse ticket price. wrong value")
+	}
 }
 
 func FormatFIO(fio string) (string, error) {
@@ -111,21 +137,16 @@ func FormatFIO(fio string) (string, error) {
 }
 
 func CheckRepost(msg string) bool {
-	formattedInput := strings.ToLower(msg)
+	keyWord := strings.ToLower(msg)
 
-	parts := strings.Fields(formattedInput)
-	if len(parts) != 1 {
-		return false
-	}
-	keyWord := parts[0]
-
-	if keyWord == "да" {
+	switch keyWord {
+	case "да":
 		return true
-	} else if keyWord == "нет" {
+	case "нет":
+		return false
+	default:
 		return false
 	}
-
-	return false
 }
 
 func convertStringsToDates(dates []string) ([]time.Time, error) {
@@ -145,7 +166,7 @@ func convertStringsToDates(dates []string) ([]time.Time, error) {
 	return result, nil
 }
 
-// prices = {20,15,25,20,30} ->
+// prices = {20,17,25,22,30} ->
 // prices[0] - цена без репоста до повышения
 // prices[1] - цена с репостом до повышения
 // prices[2] - цена без репоста после повышения
@@ -162,8 +183,9 @@ func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, cli
 		return -1
 	}
 
+	ticketType := strings.ToLower(client.TicketType)
 	switch {
-	case client.TicketType == "БАЗОВЫЙ":
+	case ticketType == "базовый":
 		if timeNow.Before(dates[0]) {
 			if client.RepostExists {
 				return cfg.Prices[1]
@@ -177,7 +199,7 @@ func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, cli
 				return cfg.Prices[2]
 			}
 		}
-	case strings.HasPrefix(client.TicketType, "ВИП"):
+	case strings.HasPrefix(ticketType, "вип"):
 		return cfg.Prices[4]
 	}
 
@@ -198,7 +220,6 @@ func GetSurnameLowercase(surname string) string {
 func UserInList(userName string, list map[string]bool) bool {
 	_, ok := list[userName]
 	if !ok {
-		log.Println("Unknown user is trying to use bot")
 		return false
 	}
 	return true
