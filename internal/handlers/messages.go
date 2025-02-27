@@ -192,11 +192,19 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			}
 			mh.clientData[chatID].FIO = formattedFio
 
-			yesButton := tgbotapi.NewKeyboardButton("Базовый")
-			noButton := tgbotapi.NewKeyboardButton("ВИП")
-			replyKeyboard := tgbotapi.NewReplyKeyboard(
-				tgbotapi.NewKeyboardButtonRow(yesButton, noButton),
-			)
+			baseButton := tgbotapi.NewKeyboardButton("Базовый")
+			vipButton := tgbotapi.NewKeyboardButton("ВИП")
+			var replyKeyboard tgbotapi.ReplyKeyboardMarkup
+
+			if userName == mh.cfg.VIPSeller {
+				replyKeyboard = tgbotapi.NewReplyKeyboard(
+					tgbotapi.NewKeyboardButtonRow(baseButton, vipButton),
+				)
+			} else {
+				replyKeyboard = tgbotapi.NewReplyKeyboard(
+					tgbotapi.NewKeyboardButtonRow(baseButton),
+				)
+			}
 			replyKeyboard.OneTimeKeyboard = true
 			replyKeyboard.ResizeKeyboard = true
 
