@@ -13,35 +13,48 @@ import (
 )
 
 const (
-	vipTicketTypeTemplate = "ВИП%d"
+	vipTicketTypeTemplate = "вип%d"
 	formattedFIOTemplate  = "%s %s %s"
+	formattedFITemplate   = "%s %s"
 )
 
-func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
-	msg := tgbotapi.NewMessage(chatID, "Выберите опцию поиска покупателя:")
-	keyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Фамилия"),
-			tgbotapi.NewKeyboardButton("Номер билета (ID)"),
-			tgbotapi.NewKeyboardButton("Продать билет"),
-		),
-	)
+func ShowOptions(chatID int64, bot *tgbotapi.BotAPI, userName string, cfg configs.AllowList) {
+	msg := tgbotapi.NewMessage(chatID, "Выберите опцию:")
+
+	checker := UserInList(userName, cfg.AllowedCheckers)
+	seller := UserInList(userName, cfg.AllowedSellers)
+
+	var keyboard tgbotapi.ReplyKeyboardMarkup
+	var row []tgbotapi.KeyboardButton
+
+	if checker {
+		row = append(row, tgbotapi.NewKeyboardButton("Отметить вход"))
+	}
+
+	if seller {
+		row = append(row, tgbotapi.NewKeyboardButton("Продать билет"))
+	}
+
+	if len(row) > 0 {
+		keyboard = tgbotapi.NewReplyKeyboard(row)
+	}
 
 	msg.ReplyMarkup = keyboard
 	_, _ = bot.Send(msg)
 }
 
 func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string {
-	successEmoji := "✅"
-	failEmoji := "❌"
+	successEmoji := "ДА ✅✅✅"
+	failEmoji := "НЕТ ❌❌❌"
 
 	var laceColor string
+	ticketType := strings.ToLower(resp.TicketType)
 	switch {
-	case resp.TicketType == "ОРГ":
+	case ticketType == "орг":
 		laceColor = cfg.Org
-	case strings.HasPrefix(resp.TicketType, "ВИП"):
+	case strings.HasPrefix(ticketType, "вип"):
 		laceColor = cfg.VIP
-	case resp.TicketType == "БАЗОВЫЙ":
+	case ticketType == "базовый":
 		laceColor = cfg.Base
 	default:
 		return "Неизвестный тип билета"
@@ -52,13 +65,14 @@ func ResponseMapper(resp *models.TicketResponse, cfg configs.LacesColors) string
 		controlStatus = successEmoji
 	}
 
-	return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s,\nПрошел контроль: %s",
+	return fmt.Sprintf("Номер билета: %s,\nФИО: %s,\nТип браслета: %s,\nЦвет браслета: %s,\nПрошел контроль? - %s",
 		resp.Id, resp.Name, resp.TicketType, laceColor, controlStatus)
 }
 
 func ValidateTicketType(ticketType string, cfg configs.SalesOptions) (string, bool) {
+	ticketType = strings.ToLower(ticketType)
 	allowedTicketTypes := make([]string, 0)
-	allowedTicketTypes = append(allowedTicketTypes, "БАЗОВЫЙ")
+	allowedTicketTypes = append(allowedTicketTypes, "базовый")
 	for i := 0; i < cfg.VIPTablesCount; i++ {
 		allowedTicketTypes = append(allowedTicketTypes, fmt.Sprintf(vipTicketTypeTemplate, i+1))
 	}
@@ -90,37 +104,49 @@ func ParseTicketPrice(input string) (int, error) {
 
 	value, err := strconv.Atoi(match)
 	if err != nil {
-		return 0, fmt.Errorf("failes to parse string to int %q: %v", match, err)
+		return 0, fmt.Errorf("failed to parse string to int %q: %v", match, err)
 	}
 
-	return value, nil
+	switch value {
+	case 17:
+		return 17, nil
+	case 20:
+		return 20, nil
+	case 22:
+		return 22, nil
+	case 25:
+		return 25, nil
+	case 30:
+		return 30, nil
+	default:
+		return -1, fmt.Errorf("failed to parse ticket price. wrong value")
+	}
 }
 
 func FormatFIO(fio string) (string, error) {
-	var err error
 	parts := strings.Fields(fio)
 
-	if len(parts) != 3 {
-		return "", err
+	if len(parts) < 2 {
+		return "", fmt.Errorf("failed to parse client's full name")
+	}
+	if len(parts) == 2 {
+		return fmt.Sprintf(formattedFITemplate, parts[0], parts[1]), nil
 	}
 
 	return fmt.Sprintf(formattedFIOTemplate, parts[0], parts[1], parts[2]), nil
 }
 
 func CheckRepost(msg string) bool {
-	formattedInput := strings.ToLower(msg)
+	keyWord := strings.ToLower(msg)
 
-	parts := strings.Fields(formattedInput)
-	if len(parts) != 1 {
+	switch keyWord {
+	case "да":
+		return true
+	case "нет":
+		return false
+	default:
 		return false
 	}
-	keyWord := parts[0]
-
-	if keyWord != "репост" {
-		return false
-	}
-
-	return true
 }
 
 func convertStringsToDates(dates []string) ([]time.Time, error) {
@@ -140,7 +166,7 @@ func convertStringsToDates(dates []string) ([]time.Time, error) {
 	return result, nil
 }
 
-// prices = {20,15,25,20,30} ->
+// prices = {20,17,25,22,30} ->
 // prices[0] - цена без репоста до повышения
 // prices[1] - цена с репостом до повышения
 // prices[2] - цена без репоста после повышения
@@ -149,6 +175,7 @@ func convertStringsToDates(dates []string) ([]time.Time, error) {
 
 // dates = {xxx} ->
 // dates[0] - дата повышения
+// dates[1] - дата конца продаж
 
 func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, client models.ClientData) int {
 	dates, err := convertStringsToDates(cfg.Dates)
@@ -156,8 +183,9 @@ func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, cli
 		return -1
 	}
 
+	ticketType := strings.ToLower(client.TicketType)
 	switch {
-	case client.TicketType == "БАЗОВЫЙ":
+	case ticketType == "базовый":
 		if timeNow.Before(dates[0]) {
 			if client.RepostExists {
 				return cfg.Prices[1]
@@ -171,7 +199,7 @@ func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, cli
 				return cfg.Prices[2]
 			}
 		}
-	case strings.HasPrefix(client.TicketType, "ВИП"):
+	case strings.HasPrefix(ticketType, "вип"):
 		return cfg.Prices[4]
 	}
 
@@ -181,10 +209,18 @@ func CalculateActualTicketPrice(timeNow time.Time, cfg configs.SalesOptions, cli
 func GetSurnameLowercase(surname string) string {
 	parts := strings.Split(surname, " ")
 
-	if len(parts) != 3 {
+	if len(parts) < 2 {
 		return ""
 	}
 
 	formattedSurname := strings.ToLower(parts[0])
 	return formattedSurname
+}
+
+func UserInList(userName string, list map[string]bool) bool {
+	_, ok := list[userName]
+	if !ok {
+		return false
+	}
+	return true
 }
