@@ -147,7 +147,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 				var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
 				if resp != nil {
-					if resp.PassedControlZone == false {
+					if !resp.PassedControlZone {
 						btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
 						inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
 					}
@@ -169,7 +169,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 				var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
 				for _, resp := range respList {
-					if resp.PassedControlZone == false {
+					if !resp.PassedControlZone {
 						btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
 						inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
 					}
@@ -227,7 +227,16 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			}
 			mh.clientData[chatID].Price = price
 
-			msg := tgbotapi.NewMessage(chatID, "Укажите наличие репоста (да/нет):")
+			yesButton := tgbotapi.NewKeyboardButton("Да")
+			noButton := tgbotapi.NewKeyboardButton("Нет")
+			replyKeyboard := tgbotapi.NewReplyKeyboard(
+				tgbotapi.NewKeyboardButtonRow(yesButton, noButton),
+			)
+			replyKeyboard.OneTimeKeyboard = true
+			replyKeyboard.ResizeKeyboard = true
+
+			msg := tgbotapi.NewMessage(chatID, "Укажите наличие репоста:")
+			msg.ReplyMarkup = replyKeyboard
 			_, _ = bot.Send(msg)
 			mh.userStates[chatID] = "awaiting_client_repost"
 
@@ -237,6 +246,11 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				_, _ = bot.Send(msg)
 				return
 			}
+
+			removeKeyboard := tgbotapi.NewRemoveKeyboard(true)
+			removeMsg := tgbotapi.NewMessage(chatID, "Ответ получен.")
+			removeMsg.ReplyMarkup = removeKeyboard
+			_, _ = bot.Send(removeMsg)
 
 			mh.clientData[chatID].RepostExists = utils.CheckRepost(text)
 
@@ -258,12 +272,14 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				photoMsg.Caption = respMsg
 				_, _ = bot.Send(photoMsg)
 			} else {
-				msg := tgbotapi.NewMessage(chatID, "Не удалось оптравить изображение")
+				msg := tgbotapi.NewMessage(chatID, "Не удалось отправить изображение")
 				_, _ = bot.Send(msg)
 			}
 
 			mh.userStates[chatID] = ""
 			delete(mh.clientData, chatID)
+
+			utils.ShowOptions(chatID, bot)
 		}
 	}
 }
