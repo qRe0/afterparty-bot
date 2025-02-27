@@ -104,7 +104,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				return
 			}
 			mh.userStates[chatID] = ""
-			utils.ShowOptions(chatID, bot)
+			utils.ShowOptions(chatID, bot, userName, mh.cfg)
 			return
 
 		case "Отметить вход":
@@ -191,19 +191,57 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				return
 			}
 			mh.clientData[chatID].FIO = formattedFio
-			msg := tgbotapi.NewMessage(chatID, "Введите тип билета (ВИПх или БАЗОВЫЙ):")
+
+			yesButton := tgbotapi.NewKeyboardButton("Базовый")
+			noButton := tgbotapi.NewKeyboardButton("ВИП")
+			replyKeyboard := tgbotapi.NewReplyKeyboard(
+				tgbotapi.NewKeyboardButtonRow(yesButton, noButton),
+			)
+			replyKeyboard.OneTimeKeyboard = true
+			replyKeyboard.ResizeKeyboard = true
+
+			msg := tgbotapi.NewMessage(chatID, "Выберите тип билета:")
+			msg.ReplyMarkup = replyKeyboard
 			_, _ = bot.Send(msg)
-			mh.userStates[chatID] = "awaiting_client_ticketType"
-		case "awaiting_client_ticketType":
-			if text == "" {
-				msg := tgbotapi.NewMessage(chatID, "Введите тип билета:")
+
+			mh.userStates[chatID] = "awaiting_client_ticket_type_choice"
+
+		case "awaiting_client_ticket_type_choice":
+			removeKeyboard := tgbotapi.NewRemoveKeyboard(true)
+
+			if strings.ToLower(text) == "базовый" {
+				mh.clientData[chatID].TicketType = "Базовый"
+
+				removeMsg := tgbotapi.NewMessage(chatID, "Выбран тип: Базовый.")
+				removeMsg.ReplyMarkup = removeKeyboard
+				_, _ = bot.Send(removeMsg)
+
+				msg := tgbotapi.NewMessage(chatID, "Введите стоимость билета:")
+				_, _ = bot.Send(msg)
+				mh.userStates[chatID] = "awaiting_client_price"
+			} else if strings.ToLower(text) == "вип" {
+				removeMsg := tgbotapi.NewMessage(chatID, "Выбран тип: ВИП. Введите номер столика:")
+				removeMsg.ReplyMarkup = removeKeyboard
+				_, _ = bot.Send(removeMsg)
+
+				mh.userStates[chatID] = "awaiting_vip_table_number"
+			} else {
+				msg := tgbotapi.NewMessage(chatID, "Неверный выбор. Нажмите «Базовый» или «ВИП».")
+				_, _ = bot.Send(msg)
+			}
+		case "awaiting_vip_table_number":
+			tableNumber := text
+			if tableNumber == "" {
+				msg := tgbotapi.NewMessage(chatID, "Номер столика не может быть пустым. Введите ещё раз:")
 				_, _ = bot.Send(msg)
 				return
 			}
 
-			ticketType, ok := utils.ValidateTicketType(text, mh.service.Cfg.SalesOption)
+			vipType := "ВИП" + tableNumber
+
+			ticketType, ok := utils.ValidateTicketType(vipType, mh.service.Cfg.SalesOption)
 			if !ok {
-				msg := tgbotapi.NewMessage(chatID, "Неверный тип билета. Попробуйте ещё раз:")
+				msg := tgbotapi.NewMessage(chatID, "Неверный тип (возможно неправильный формат стола). Попробуйте ещё раз:")
 				_, _ = bot.Send(msg)
 				return
 			}
@@ -242,7 +280,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		case "awaiting_client_repost":
 			if text == "" {
-				msg := tgbotapi.NewMessage(chatID, "Ответ не может быть пустым. Укажите наличие репоста (да/нет):")
+				msg := tgbotapi.NewMessage(chatID, "Ответ не может быть пустым. Укажите наличие репоста (Да/Нет):")
 				_, _ = bot.Send(msg)
 				return
 			}
@@ -279,7 +317,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			mh.userStates[chatID] = ""
 			delete(mh.clientData, chatID)
 
-			utils.ShowOptions(chatID, bot)
+			utils.ShowOptions(chatID, bot, userName, mh.cfg)
 		}
 	}
 }

@@ -18,14 +18,26 @@ const (
 	formattedFITemplate   = "%s %s"
 )
 
-func ShowOptions(chatID int64, bot *tgbotapi.BotAPI) {
+func ShowOptions(chatID int64, bot *tgbotapi.BotAPI, userName string, cfg configs.AllowList) {
 	msg := tgbotapi.NewMessage(chatID, "Выберите опцию:")
-	keyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Отметить вход"),
-			tgbotapi.NewKeyboardButton("Продать билет"),
-		),
-	)
+
+	checker := UserInList(userName, cfg.AllowedCheckers)
+	seller := UserInList(userName, cfg.AllowedSellers)
+
+	var keyboard tgbotapi.ReplyKeyboardMarkup
+	var row []tgbotapi.KeyboardButton
+
+	if checker {
+		row = append(row, tgbotapi.NewKeyboardButton("Отметить вход"))
+	}
+
+	if seller {
+		row = append(row, tgbotapi.NewKeyboardButton("Продать билет"))
+	}
+
+	if len(row) > 0 {
+		keyboard = tgbotapi.NewReplyKeyboard(row)
+	}
 
 	msg.ReplyMarkup = keyboard
 	_, _ = bot.Send(msg)
