@@ -265,7 +265,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 				return
 			}
 
-			price, err := utils.ParseTicketPrice(text, userName)
+			price, err := utils.ParseTicketPrice(text, userName, mh.cfg)
 			if err != nil {
 				msg := tgbotapi.NewMessage(chatID, "Проверьте введенную цену. Попробуйте ещё раз:")
 				_, _ = bot.Send(msg)
