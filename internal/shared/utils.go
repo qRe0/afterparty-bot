@@ -91,7 +91,7 @@ func ValidateTicketType(ticketType string, cfg configs.SalesOptions) (string, bo
 	return ticketType, true
 }
 
-func ParseTicketPrice(input string) (int, error) {
+func ParseTicketPrice(input, username string, cfg configs.AllowList) (int, error) {
 	if input == "" {
 		return 0, fmt.Errorf("ticket price is not specified")
 	}
@@ -108,6 +108,12 @@ func ParseTicketPrice(input string) (int, error) {
 	}
 
 	switch value {
+	case 15:
+		if username == cfg.SSSeller {
+			return 15, nil
+		} else {
+			return -1, fmt.Errorf("failed to parse ticket price. wrong value")
+		}
 	case 17:
 		return 17, nil
 	case 20:
