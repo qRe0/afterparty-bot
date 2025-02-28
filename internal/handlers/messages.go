@@ -155,7 +155,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 					msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
 					_, _ = bot.Send(msg)
 				} else {
-					mh.logger.Panic("HandleMessages:: SearchById:: Response is nil")
+					mh.logger.Info("HandleMessages:: SearchById:: Response is nil. No clients found")
 				}
 			} else {
 				respList, respMsg, err := mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
