@@ -31,18 +31,13 @@ jobs:
             exit 0
           fi
 
-      - name: Railway login
-        run: |
-          echo "${{ secrets.RAILWAY_TOKEN }}" | railway login --browserless
-
       - name: Build Go application
         run: go build -tags netgo -ldflags '-s -w' -o afterparty_tg_bot ./cmd
 
       - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway init --project "${{ secrets.RAILWAY_PROJECT_ID }}"
-          # Выбираем нужное окружение
           railway environment use "${{ steps.set-env.outputs.ENV_ID }}"
-
-          # Теперь выполняем деплой
           railway up
