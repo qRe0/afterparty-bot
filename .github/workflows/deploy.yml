@@ -33,7 +33,7 @@ jobs:
 
       - name: Railway login
         run: |
-          railway login -t "${{ secrets.RAILWAY_TOKEN }}"
+          railway login --token "${{ secrets.RAILWAY_TOKEN }}"
 
       - name: Build Go application
         run: go build -tags netgo -ldflags '-s -w' -o afterparty_tg_bot ./cmd
