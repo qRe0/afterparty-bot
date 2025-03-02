@@ -1,0 +1,48 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [ "dev", "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.23"
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Set environment
+        id: set-env
+        run: |
+          if [ "${{ github.ref_name }}" = "dev" ]; then
+            echo "ENV_ID=${{ secrets.RAILWAY_ENV_ID_STAGING }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            echo "ENV_ID=${{ secrets.RAILWAY_ENV_ID_PRODUCTION }}" >> $GITHUB_OUTPUT
+          else
+            echo "Неизвестная ветка: ${{ github.ref_name }}. Пропускаю деплой."
+            exit 0
+          fi
+
+      - name: Railway login
+        run: |
+          railway login -t "${{ secrets.RAILWAY_TOKEN }}"
+
+      - name: Build Go application
+        run: go build -tags netgo -ldflags '-s -w' -o afterparty_tg_bot ./cmd
+
+      - name: Deploy to Railway
+        run: |
+          railway init --project "${{ secrets.RAILWAY_PROJECT_ID }}"
+          # Выбираем нужное окружение
+          railway environment use "${{ steps.set-env.outputs.ENV_ID }}"
+
+          # Теперь выполняем деплой
+          railway up
