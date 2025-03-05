@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -12,7 +11,8 @@ import (
 	"github.com/qRe0/afterparty-bot/internal/configs"
 	"github.com/qRe0/afterparty-bot/internal/models"
 	"github.com/qRe0/afterparty-bot/internal/service"
-	utils "github.com/qRe0/afterparty-bot/internal/shared"
+	"github.com/qRe0/afterparty-bot/internal/shared/logger"
+	"github.com/qRe0/afterparty-bot/internal/shared/utils"
 	"go.uber.org/zap"
 )
 
@@ -28,30 +28,20 @@ type MessagesHandler struct {
 	userStates map[int64]string
 	clientData map[int64]*models.ClientData
 	cfg        configs.AllowList
-	logger     *zap.Logger
 }
 
 func New(service *ticket_service.TicketsService, cfg configs.AllowList) MessagesHandler {
-	var lgr *zap.Logger
-	if os.Getenv("APP_ENV") == "dev" {
-		lgr = zap.Must(zap.NewDevelopment())
-	} else if os.Getenv("APP_ENV") == "prod" {
-		lgr = zap.Must(zap.NewProduction())
-	}
-	defer lgr.Sync()
-
 	return MessagesHandler{
 		service:    service,
 		userStates: make(map[int64]string),
 		clientData: make(map[int64]*models.ClientData),
 		cfg:        cfg,
-		logger:     lgr,
 	}
 }
 
-func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.BotAPI) {
-	ctx := context.Background()
+func (mh *MessagesHandler) HandleMessages(ctx context.Context, update tgbotapi.Update, bot *tgbotapi.BotAPI) {
 	var chatID int64
+	lgr := logger.New(ctx)
 
 	if update.CallbackQuery != nil {
 		chatID = update.CallbackQuery.Message.Chat.ID
@@ -61,7 +51,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			userId := strings.TrimPrefix(data, "confirm_yes_")
 			msg, err := mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
 			if err != nil {
-				mh.logger.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (1st call) with error: ", zap.Error(err))
+				lgr.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (1st call) with error: ", zap.Error(err))
 				botMsg := tgbotapi.NewMessage(chatID, msg)
 				_, _ = bot.Send(botMsg)
 			}
@@ -74,7 +64,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			userId := data
 			msg, err := mh.service.MarkAsEntered(ctx, &userId, &chatID, bot)
 			if err != nil {
-				mh.logger.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (2nd call) with error: ", zap.Error(err))
+				lgr.Warn("HandleMessages:: MarkAsEntered:: Error during MarkAsEntered service method (2nd call) with error: ", zap.Error(err))
 				botMsg := tgbotapi.NewMessage(chatID, msg)
 				_, _ = bot.Send(botMsg)
 			}
@@ -85,7 +75,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
 		_, err := bot.Request(callback)
 		if err != nil {
-			mh.logger.Warn("HandleMessages:: Failed to send callback with error: ", zap.Error(err))
+			lgr.Warn("HandleMessages:: Failed to send callback with error: ", zap.Error(err))
 		}
 		return
 	}
@@ -98,7 +88,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 		switch text {
 		case "/start":
 			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) && !utils.UserInList(userName, mh.cfg.AllowedSellers) {
-				mh.logger.Info("Unauthorized user trying to use bot")
+				lgr.Info("Unauthorized user trying to use bot")
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав на использование бота.")
 				_, _ = bot.Send(msg)
 				return
@@ -109,7 +99,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		case "Отметить вход":
 			if !utils.UserInList(userName, mh.cfg.AllowedCheckers) {
-				mh.logger.Info("Unauthorized user trying to use bot")
+				lgr.Info("Unauthorized user trying to use bot")
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для отметки входа.")
 				_, _ = bot.Send(msg)
 				return
@@ -121,7 +111,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 
 		case "Продать билет":
 			if !utils.UserInList(userName, mh.cfg.AllowedSellers) {
-				mh.logger.Info("Unauthorized user trying to use bot")
+				lgr.Info("Unauthorized user trying to use bot")
 				msg := tgbotapi.NewMessage(chatID, "У Вас нет прав для продажи билетов.")
 				_, _ = bot.Send(msg)
 				return
@@ -138,7 +128,7 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 			if _, err := strconv.Atoi(text); err == nil {
 				resp, respMsg, err := mh.service.SearchById(ctx, &update.Message.Text, &chatID, bot)
 				if err != nil {
-					mh.logger.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
+					lgr.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
 					botMsg := tgbotapi.NewMessage(chatID, respMsg)
 					_, _ = bot.Send(botMsg)
 				}
@@ -155,12 +145,12 @@ func (mh *MessagesHandler) HandleMessages(update tgbotapi.Update, bot *tgbotapi.
 					msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
 					_, _ = bot.Send(msg)
 				} else {
-					mh.logger.Info("HandleMessages:: SearchById:: Response is nil. No clients found")
+					lgr.Info("HandleMessages:: SearchById:: Response is nil. No clients found")
 				}
 			} else {
 				respList, respMsg, err := mh.service.SearchBySurname(ctx, &update.Message.Text, &chatID, bot)
 				if err != nil {
-					mh.logger.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
+					lgr.Warn("HandleMessages:: SearchById:: Error during MarkAsEntered service method", zap.Error(err))
 					botMsg := tgbotapi.NewMessage(chatID, respMsg)
 					_, _ = bot.Send(botMsg)
 				}
