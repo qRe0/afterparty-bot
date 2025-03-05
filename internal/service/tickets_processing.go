@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/qRe0/afterparty-bot/internal/shared/logger"
+	"github.com/qRe0/afterparty-bot/internal/shared/utils"
 	"go.uber.org/zap"
 
 	"github.com/fogleman/gg"
@@ -21,7 +22,6 @@ import (
 	errs "github.com/qRe0/afterparty-bot/internal/errors"
 	"github.com/qRe0/afterparty-bot/internal/models"
 	"github.com/qRe0/afterparty-bot/internal/repository"
-	"github.com/qRe0/afterparty-bot/internal/shared"
 )
 
 type TicketsRepo interface {
@@ -34,74 +34,66 @@ type TicketsRepo interface {
 }
 
 type TicketsService struct {
-	repo   *ticket_repository.TicketsRepo
-	Cfg    configs.Config
-	mu     sync.Mutex
-	logger *zap.Logger
+	repo *ticket_repository.TicketsRepo
+	Cfg  configs.Config
+	mu   sync.Mutex
 }
 
 func New(repo *ticket_repository.TicketsRepo, cfg configs.Config) *TicketsService {
-	var lgr *zap.Logger
-	if os.Getenv("APP_ENV") == "dev" {
-		lgr = zap.Must(zap.NewDevelopment())
-	} else if os.Getenv("APP_ENV") == "prod" {
-		lgr = zap.Must(zap.NewProduction())
-	}
-	defer lgr.Sync()
-
 	return &TicketsService{
-		repo:   repo,
-		Cfg:    cfg,
-		logger: lgr,
+		repo: repo,
+		Cfg:  cfg,
 	}
 }
 
 func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI) ([]models.TicketResponse, string, error) {
-	ts.logger.Info("TicketService:: Started SearchBySurname method call")
+	lgr := logger.New(ctx)
+
+	lgr.Info("TicketService:: Started SearchBySurname method call")
 
 	if surname == nil || *surname == "" {
 		msg := "Предоставлена пустая фамилия пользователя"
-		ts.logger.Error("TicketService:: SearchBySurname:: Empty surname passed")
+		lgr.Error("TicketService:: SearchBySurname:: Empty surname passed")
 		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "surname")
 	}
-	ts.logger.Debug("TicketsService:: SearchBySurname:: surname checked")
+	lgr.Debug("TicketsService:: SearchBySurname:: surname checked")
 
 	if chatID == nil {
 		msg := "Предоставлен пустая ID чата"
-		ts.logger.Error("TicketService:: SearchBySurname:: Empty chatId passed")
+		lgr.Error("TicketService:: SearchBySurname:: Empty chatId passed")
 		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "chatId")
 	}
-	ts.logger.Debug("TicketsService:: SearchBySurname:: chatId checked")
+	lgr.Debug("TicketsService:: SearchBySurname:: chatId checked")
 
 	if bot == nil {
-		ts.logger.Panic("TicketsService:: SearchBySurname:: Bot instance is empty (nil)")
+		lgr.Panic("TicketsService:: SearchBySurname:: Bot instance is empty (nil)")
 	}
 
 	formattedSurname := strings.ToLower(*surname)
 	partSurnameToSearch := formattedSurname + "%"
 	respList, err := ts.repo.SearchBySurname(ctx, partSurnameToSearch)
 	if err != nil {
-		ts.logger.Error("TicketService:: SearchBySurname_1:: Repository method returned error", zap.Error(err))
+		lgr.Error("TicketService:: SearchBySurname_1:: Repository method returned error", zap.Error(err))
 		msg := "Ошибка при поиске по фамилии"
 		return nil, msg, err
 	}
 	if len(respList) == 0 {
-		ts.logger.Debug("TicketService:: SearchBySurname:: No clients found by part of surname")
-		ts.logger.Debug("TicketService:: SearchBySurname:: Trying to find client by full surname")
+		lgr.Debug("TicketService:: SearchBySurname:: No clients found by part of surname")
+		lgr.Debug("TicketService:: SearchBySurname:: Trying to find client by full surname")
 		fullSurnameToSearch := formattedSurname
 		newRespList, err := ts.repo.SearchBySurname(ctx, fullSurnameToSearch)
 		if err != nil {
-			ts.logger.Error("TicketService:: SearchBySurname_2:: Repository method returned error", zap.Error(err))
+			lgr.Error("TicketService:: SearchBySurname_2:: Repository method returned error", zap.Error(err))
 			msg := "Ошибка при поиске по фамилии"
 			return nil, msg, err
 		}
 		if len(newRespList) == 0 {
-			ts.logger.Info("TicketService:: SearchBySurname:: No clients found with specified surname")
+			lgr.Info("TicketService:: SearchBySurname:: No clients found with specified surname")
 			msg := "Не удалось найти клиента с указанной фамилией"
 			return nil, msg, err
 		}
 	}
-	ts.logger.Info("TicketsService:: SearchBySurname:: Repository method returned result successfully")
+	lgr.Info("TicketsService:: SearchBySurname:: Repository method returned result successfully")
 
 	var result strings.Builder
 	result.WriteString("Найдены следующие покупатели:\n\n")
@@ -109,79 +101,83 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 		result.WriteString(utils.ResponseMapper(&resp, ts.Cfg.LacesColor) + "\n\n")
 	}
 
-	ts.logger.Info("TicketsService:: Finished SearchBySurname method call")
+	lgr.Info("TicketsService:: Finished SearchBySurname method call")
 
 	return respList, result.String(), nil
 }
 
 func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (*models.TicketResponse, string, error) {
-	ts.logger.Info("TicketService:: Started SearchById method call")
+	lgr := logger.New(ctx)
+
+	lgr.Info("TicketService:: Started SearchById method call")
 
 	if userId == nil || *userId == "" {
 		msg := "Предоставлен пустой ID пользователя"
-		ts.logger.Error("TicketService:: SearchById:: Empty userId passed")
+		lgr.Error("TicketService:: SearchById:: Empty userId passed")
 		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "userId")
 	}
-	ts.logger.Debug("TicketsService:: SearchById:: userId checked")
+	lgr.Debug("TicketsService:: SearchById:: userId checked")
 
 	if chatID == nil {
 		msg := "Предоставлен пустой ID чата"
-		ts.logger.Error("TicketService:: SearchById:: Empty chatId passed")
+		lgr.Error("TicketService:: SearchById:: Empty chatId passed")
 		return nil, msg, errors.Wrap(errs.ErrCheckingBaseParameters, "chatId")
 	}
-	ts.logger.Debug("TicketsService:: SearchById:: chatId checked")
+	lgr.Debug("TicketsService:: SearchById:: chatId checked")
 
 	if bot == nil {
-		ts.logger.Panic("TicketsService:: SearchById:: Bot instance is empty (nil)")
+		lgr.Panic("TicketsService:: SearchById:: Bot instance is empty (nil)")
 	}
 
 	resp, err := ts.repo.SearchById(ctx, *userId)
 	if err != nil {
-		ts.logger.Error("TicketService:: SearchById:: Repository method returned error", zap.Error(err))
+		lgr.Error("TicketService:: SearchById:: Repository method returned error", zap.Error(err))
 		msg := "Не найдено пользователся с указанным типом билета"
 		return nil, msg, err
 	}
-	ts.logger.Info("TicketsService:: SearchById:: Repository method returned result successfully")
+	lgr.Info("TicketsService:: SearchById:: Repository method returned result successfully")
 
 	var resultMsg strings.Builder
 	resultMsg.WriteString("Найдены следующие покупатели:\n\n")
 	resultMsg.WriteString(utils.ResponseMapper(resp, ts.Cfg.LacesColor) + "\n\n")
 
-	ts.logger.Info("TicketsService:: Finished SearchById method call")
+	lgr.Info("TicketsService:: Finished SearchById method call")
 
 	return resp, resultMsg.String(), nil
 }
 
 func (ts *TicketsService) MarkAsEntered(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (string, error) {
-	ts.logger.Info("TicketService:: Started MarkAsEntered method call")
+	lgr := logger.New(ctx)
+
+	lgr.Info("TicketService:: Started MarkAsEntered method call")
 
 	if userId == nil || *userId == "" {
 		msg := "Предоставлен пустой ID пользователя"
-		ts.logger.Error("TicketService:: MarkAsEntered:: Empty userId passed")
+		lgr.Error("TicketService:: MarkAsEntered:: Empty userId passed")
 		return msg, errors.Wrap(errs.ErrCheckingBaseParameters, "userId")
 	}
-	ts.logger.Debug("TicketsService:: MarkAsEntered:: userId checked")
+	lgr.Debug("TicketsService:: MarkAsEntered:: userId checked")
 
 	if chatID == nil {
 		msg := "Предоставлен пустой ID чата"
-		ts.logger.Error("TicketService:: MarkAsEntered:: Empty chatId passed")
+		lgr.Error("TicketService:: MarkAsEntered:: Empty chatId passed")
 		return msg, errors.Wrap(errs.ErrCheckingBaseParameters, "chatID")
 	}
-	ts.logger.Debug("TicketsService:: MarkAsEntered:: chatId checked")
+	lgr.Debug("TicketsService:: MarkAsEntered:: chatId checked")
 
 	if bot == nil {
-		ts.logger.Panic("TicketsService:: MarkAsEntered:: Bot instance is empty (nil)")
+		lgr.Panic("TicketsService:: MarkAsEntered:: Bot instance is empty (nil)")
 	}
 
 	resp, err := ts.repo.MarkAsEntered(ctx, *userId)
 	if err != nil || resp == nil {
-		ts.logger.Error("TicketService:: MarkAsEntered:: Repository method returned error", zap.Error(err))
+		lgr.Error("TicketService:: MarkAsEntered:: Repository method returned error", zap.Error(err))
 		msg := "Ошибка вызова метода репозитория MarkAsEntered"
 		return msg, err
 	}
-	ts.logger.Info("TicketsService:: MarkAsEntered:: Repository method returned result successfully")
+	lgr.Info("TicketsService:: MarkAsEntered:: Repository method returned result successfully")
 
-	ts.logger.Info("TicketsService:: Finished MarkAsEntered method call")
+	lgr.Info("TicketsService:: Finished MarkAsEntered method call")
 
 	mappedResp := fmt.Sprintf("%s прошел контроль (ID: %s)", resp.Name, resp.Id)
 	return mappedResp, nil
@@ -193,75 +189,77 @@ func (ts *TicketsService) SellTicket(
 	bot *tgbotapi.BotAPI,
 	client *models.ClientData,
 ) (string, *bytes.Buffer, bool, error) {
-	ts.logger.Info("TicketService:: Started SellTicket method call")
+	lgr := logger.New(ctx)
+
+	lgr.Info("TicketService:: Started SellTicket method call")
 
 	if client == nil {
 		msg := "Данные клиента не были предоставлены"
-		ts.logger.Error("TicketService:: SellTicket:: Empty userId passed")
+		lgr.Error("TicketService:: SellTicket:: Empty userId passed")
 		return msg, nil, false, errors.Wrap(errs.ErrCheckingBaseParameters, "client")
 	}
-	ts.logger.Debug("TicketsService:: SellTicket:: client checked")
+	lgr.Debug("TicketsService:: SellTicket:: client checked")
 
 	if bot == nil {
-		ts.logger.Panic("TicketsService:: SellTicket:: Bot instance is empty (nil)")
+		lgr.Panic("TicketsService:: SellTicket:: Bot instance is empty (nil)")
 	}
 
-	ts.logger.Debug("TicketsService:: SellTicket:: Starting data preparation to call repository layer")
+	lgr.Debug("TicketsService:: SellTicket:: Starting data preparation to call repository layer")
 	clientSurname := utils.GetSurnameLowercase(client.FIO)
 	actualTicketPrice := utils.CalculateActualTicketPrice(time.Now(), ts.Cfg.SalesOption, *client)
 	sellerTag := update.Message.From.UserName
 	sellerId := update.Message.From.ID
 	client.TicketType = strings.ToUpper(client.TicketType)
-	ts.logger.Debug("TicketsService:: SellTicket:: All the data prepared to call repository layer")
+	lgr.Debug("TicketsService:: SellTicket:: All the data prepared to call repository layer")
 
-	ts.logger.Debug("TicketsService:: SellTicket:: Calling repository method")
+	lgr.Debug("TicketsService:: SellTicket:: Calling repository method")
 	ticketNo, err := ts.repo.SellTicket(ctx, *client, "@"+sellerTag, clientSurname, actualTicketPrice)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
-			ts.logger.Info("TicketService:: SellTicket:: This client already bought a ticket")
+			lgr.Info("TicketService:: SellTicket:: This client already bought a ticket")
 			msg := "Данный клиент уже купил билет"
 			return msg, nil, false, err
 		}
-		ts.logger.Error("TicketService:: SellTicket:: Repository method returned error", zap.Error(err))
+		lgr.Error("TicketService:: SellTicket:: Repository method returned error", zap.Error(err))
 		msg := "Ошибка вызова метода репозитория SellTicket"
 		return msg, nil, false, err
 	}
-	ts.logger.Info("TicketsService:: SellTicket:: Repository method returned result successfully")
+	lgr.Info("TicketsService:: SellTicket:: Repository method returned result successfully")
 
-	ts.logger.Debug("TicketsService:: SellTicket:: Trying to update seller's table")
+	lgr.Debug("TicketsService:: SellTicket:: Trying to update seller's table")
 	err = ts.repo.UpdateSellersTable(ctx, ticketNo, sellerId, "@"+sellerTag)
 	if err != nil {
-		ts.logger.Error("TicketService:: SellTicket:: Can't update sellers table with error: ", zap.Error(err))
+		lgr.Error("TicketService:: SellTicket:: Can't update sellers table with error: ", zap.Error(err))
 	}
-	ts.logger.Info("TicketsService:: SellTicket:: Sellers table updated successfully")
+	lgr.Info("TicketsService:: SellTicket:: Sellers table updated successfully")
 
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	ts.logger.Debug("TicketsService:: SellTicket:: Trying to add row to Google Sheet")
+	lgr.Debug("TicketsService:: SellTicket:: Trying to add row to Google Sheet")
 	err = ts.addRowToGoogleSheet(*client, sellerTag, ticketNo)
 	if err != nil {
-		ts.logger.Error("TicketService:: SellTicket:: Can't update Google Sheet with error: ", zap.Error(err))
+		lgr.Error("TicketService:: SellTicket:: Can't update Google Sheet with error: ", zap.Error(err))
 		msgTmpl := "Не удалось записать данные в гугл таблицу. Напишите @yahor_malinouski номер билета (%v), который не был записан в гугл таблицу и сгенерируйте билет вручную через Canva"
 		msg := fmt.Sprintf(msgTmpl, ticketNo)
 		return msg, nil, false, err
 	}
-	ts.logger.Info("TicketsService:: SellTicket:: Google Sheet updated successfully")
+	lgr.Info("TicketsService:: SellTicket:: Google Sheet updated successfully")
 
-	ts.logger.Debug("TicketsService:: SellTicket:: Trying to generate ticket image")
+	lgr.Debug("TicketsService:: SellTicket:: Trying to generate ticket image")
 	ticketGenerated := true
 	imageBuffer, err := ts.generateTicketImage(ticketNo)
 	if err != nil {
 		ticketGenerated = false
-		ts.logger.Error("TicketService:: SellTicket:: Can't generate ticket image with error: ", zap.Error(err))
+		lgr.Error("TicketService:: SellTicket:: Can't generate ticket image with error: ", zap.Error(err))
 		msgTmpl := "Не удалось сгенерировать изображение билета. Cгенерируйте билет вручную через Canva (номер билета: %v)"
 		msg := fmt.Sprintf(msgTmpl, ticketNo)
 		return msg, nil, ticketGenerated, err
 	}
-	ts.logger.Info("TicketsService:: SellTicket:: Ticket image generated successfully")
+	lgr.Info("TicketsService:: SellTicket:: Ticket image generated successfully")
 
-	ts.logger.Info("TicketsService:: Finished SellTicket method call")
+	lgr.Info("TicketsService:: Finished SellTicket method call")
 
 	msg := fmt.Sprintf("Билет успешно продан!\nФИО покупателя: %s\nНомер билета: %d", client.FIO, ticketNo)
 	return msg, imageBuffer, ticketGenerated, nil
