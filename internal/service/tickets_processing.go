@@ -70,6 +70,7 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 	}
 
 	formattedSurname := strings.ToLower(*surname)
+	formattedSurname = strings.Replace(formattedSurname, "ё", "е", -1)
 	partSurnameToSearch := formattedSurname + "%"
 	respList, err := ts.repo.SearchBySurname(ctx, partSurnameToSearch)
 	if err != nil {
