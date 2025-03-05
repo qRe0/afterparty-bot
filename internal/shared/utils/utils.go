@@ -220,6 +220,7 @@ func GetSurnameLowercase(surname string) string {
 	}
 
 	formattedSurname := strings.ToLower(parts[0])
+	formattedSurname = strings.Replace(formattedSurname, "ё", "е", -1)
 	return formattedSurname
 }
 
