@@ -206,6 +206,7 @@ func (ts *TicketsService) SellTicket(
 	}
 
 	lgr.Debug("TicketsService:: SellTicket:: Starting data preparation to call repository layer")
+	client.FIO = strings.Title(client.FIO)
 	clientSurname := utils.GetSurnameLowercase(client.FIO)
 	actualTicketPrice := utils.CalculateActualTicketPrice(time.Now(), ts.Cfg.SalesOption, *client)
 	sellerTag := update.Message.From.UserName
