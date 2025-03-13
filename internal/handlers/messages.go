@@ -132,8 +132,10 @@ func (mh *MessagesHandler) HandleMessages(ctx context.Context, update tgbotapi.U
 					botMsg := tgbotapi.NewMessage(chatID, respMsg)
 					_, _ = bot.Send(botMsg)
 				}
-				msg := tgbotapi.NewMessage(chatID, respMsg)
-				_, _ = bot.Send(msg)
+				if respMsg != "Не найдено пользователся с указанным номером билета или ФИО" {
+					msg := tgbotapi.NewMessage(chatID, respMsg)
+					_, _ = bot.Send(msg)
+				}
 
 				var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
 				if resp != nil {
@@ -141,7 +143,7 @@ func (mh *MessagesHandler) HandleMessages(ctx context.Context, update tgbotapi.U
 						btn := tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("%s (ID: %s)", resp.Name, resp.Id), resp.Id)
 						inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(btn))
 					}
-					msg = tgbotapi.NewMessage(chatID, "Выберите нужного покупателя, чтобы отметить вход:")
+					msg := tgbotapi.NewMessage(chatID, "Выберите нужного покупателя, чтобы отметить вход:")
 					msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
 					_, _ = bot.Send(msg)
 				} else {

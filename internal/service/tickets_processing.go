@@ -133,7 +133,7 @@ func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID
 	resp, err := ts.repo.SearchById(ctx, *userId)
 	if err != nil {
 		lgr.Error("TicketService:: SearchById:: Repository method returned error", zap.Error(err))
-		msg := "Не найдено пользователся с указанным типом билета"
+		msg := "Не найдено пользователся с указанным номером билета или ФИО"
 		return nil, msg, err
 	}
 	lgr.Info("TicketsService:: SearchById:: Repository method returned result successfully")
