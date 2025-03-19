@@ -209,13 +209,13 @@ func (ts *TicketsService) SellTicket(
 	client.FIO = strings.Title(client.FIO)
 	clientSurname := utils.GetSurnameLowercase(client.FIO)
 	actualTicketPrice := utils.CalculateActualTicketPrice(time.Now(), ts.Cfg.SalesOption, *client)
-	sellerTag := update.Message.From.UserName
+	sellerTag := "@" + update.Message.From.UserName
 	sellerId := update.Message.From.ID
 	client.TicketType = strings.ToUpper(client.TicketType)
 	lgr.Debug("TicketsService:: SellTicket:: All the data prepared to call repository layer")
 
 	lgr.Debug("TicketsService:: SellTicket:: Calling repository method")
-	ticketNo, err := ts.repo.SellTicket(ctx, *client, "@"+sellerTag, clientSurname, actualTicketPrice)
+	ticketNo, err := ts.repo.SellTicket(ctx, *client, sellerTag, clientSurname, actualTicketPrice)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
@@ -230,7 +230,7 @@ func (ts *TicketsService) SellTicket(
 	lgr.Info("TicketsService:: SellTicket:: Repository method returned result successfully")
 
 	lgr.Debug("TicketsService:: SellTicket:: Trying to update seller's table")
-	err = ts.repo.UpdateSellersTable(ctx, ticketNo, sellerId, "@"+sellerTag)
+	err = ts.repo.UpdateSellersTable(ctx, ticketNo, sellerId, sellerTag)
 	if err != nil {
 		lgr.Error("TicketService:: SellTicket:: Can't update sellers table with error: ", zap.Error(err))
 	}
@@ -300,8 +300,8 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 	const (
 		backgroundPath = "ticket.png"
 		fontPath       = "font.ttf"
-		fontSize       = 82
-		posX, posY     = 1450, 895
+		fontSize       = 105
+		posX, posY     = 870, 415
 	)
 
 	bg, err := gg.LoadImage(backgroundPath)
@@ -315,7 +315,7 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 		return nil, fmt.Errorf("failed to load font: %v", err)
 	}
 
-	dc.SetHexColor("#f88707")
+	dc.SetHexColor("#000000")
 	ticketText := fmt.Sprintf("%d", ticketNo)
 	dc.DrawStringAnchored(ticketText, posX, posY, 0.5, 0.5)
 
