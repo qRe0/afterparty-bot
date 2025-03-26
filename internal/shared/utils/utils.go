@@ -109,7 +109,7 @@ func ParseTicketPrice(input, username string, cfg configs.AllowList) (int, error
 
 	switch value {
 	case 15:
-		if username == cfg.SSSeller {
+		if UserInList(username, cfg.SSSellers) {
 			return 15, nil
 		} else {
 			return -1, fmt.Errorf("failed to parse ticket price. wrong value")

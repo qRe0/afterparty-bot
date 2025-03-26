@@ -188,7 +188,7 @@ func (mh *MessagesHandler) HandleMessages(ctx context.Context, update tgbotapi.U
 			vipButton := tgbotapi.NewKeyboardButton("ВИП")
 			var replyKeyboard tgbotapi.ReplyKeyboardMarkup
 
-			if userName == mh.cfg.VIPSeller {
+			if utils.UserInList(userName, mh.cfg.VIPSellers) {
 				replyKeyboard = tgbotapi.NewReplyKeyboard(
 					tgbotapi.NewKeyboardButtonRow(baseButton, vipButton),
 				)

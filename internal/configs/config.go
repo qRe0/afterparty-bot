@@ -44,15 +44,15 @@ type SalesOptions struct {
 type tempAllowList struct {
 	AllowedSellers  []string `env:"ALLOWED_SELLERS"  envSeparator:","`
 	AllowedCheckers []string `env:"ALLOWED_CHECKERS" envSeparator:","`
-	VIPSeller       string   `env:"VIP_SELLER"`
-	SSSeller        string   `env:"SS_SELLER"`
+	VIPSellers      []string `env:"VIP_SELLERS"  envSeparator:","`
+	SSSellers       []string `env:"SS_SELLERS"  envSeparator:","`
 }
 
 type AllowList struct {
 	AllowedSellers  map[string]bool
 	AllowedCheckers map[string]bool
-	VIPSeller       string
-	SSSeller        string
+	VIPSellers      map[string]bool
+	SSSellers       map[string]bool
 }
 
 type Config struct {
@@ -119,6 +119,16 @@ func LoadEnvs() (*Config, error) {
 		allowedCheckersMap[checker] = true
 	}
 
+	vipSellerMap := make(map[string]bool)
+	for _, vipSellers := range tmpAllowList.VIPSellers {
+		vipSellerMap[vipSellers] = true
+	}
+
+	ssSellerMap := make(map[string]bool)
+	for _, ssSeller := range tmpAllowList.SSSellers {
+		ssSellerMap[ssSeller] = true
+	}
+
 	cfg := &Config{
 		DB:          dbCfg,
 		TG:          tgConfig,
@@ -128,8 +138,8 @@ func LoadEnvs() (*Config, error) {
 		AllowList: AllowList{
 			AllowedSellers:  allowedSellersMap,
 			AllowedCheckers: allowedCheckersMap,
-			VIPSeller:       tmpAllowList.VIPSeller,
-			SSSeller:        tmpAllowList.SSSeller,
+			VIPSellers:      vipSellerMap,
+			SSSellers:       ssSellerMap,
 		},
 	}
 
