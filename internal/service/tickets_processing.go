@@ -298,8 +298,8 @@ func (ts *TicketsService) addRowToGoogleSheet(client models.ClientData, sellerTa
 
 func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, error) {
 	const (
-		backgroundPath = "ticket.png"
-		fontPath       = "font.ttf"
+		backgroundPath = "assets/ticket.png"
+		fontPath       = "assets/font.ttf"
 		fontSize       = 105
 		posX, posY     = 870, 415
 	)
