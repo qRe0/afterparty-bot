@@ -21,7 +21,7 @@ import (
 	"github.com/qRe0/afterparty-bot/internal/configs"
 	errs "github.com/qRe0/afterparty-bot/internal/errors"
 	"github.com/qRe0/afterparty-bot/internal/models"
-	"github.com/qRe0/afterparty-bot/internal/repository"
+	ticket_repository "github.com/qRe0/afterparty-bot/internal/repository"
 )
 
 type TicketsRepo interface {
@@ -301,7 +301,8 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 		backgroundPath = "assets/ticket.png"
 		fontPath       = "assets/font.ttf"
 		fontSize       = 105
-		posX, posY     = 870, 415
+		posX, posY     = 970, 515
+		hexColor       = "#832f2e"
 	)
 
 	bg, err := gg.LoadImage(backgroundPath)
@@ -315,7 +316,7 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 		return nil, fmt.Errorf("failed to load font: %v", err)
 	}
 
-	dc.SetHexColor("#000000")
+	dc.SetHexColor(hexColor)
 	ticketText := fmt.Sprintf("%d", ticketNo)
 	dc.DrawStringAnchored(ticketText, posX, posY, 0.5, 0.5)
 
