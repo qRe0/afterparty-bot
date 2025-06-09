@@ -4,10 +4,7 @@ import (
 	"github.com/caarlos0/env"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
-)
-
-var (
-	ErrLoadEnvVars = errors.New("failed to load env vars")
+	customErrors "github.com/qRe0/afterparty-bot/internal/errors"
 )
 
 type DBConfig struct {
@@ -67,7 +64,7 @@ type Config struct {
 func LoadEnvs() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
-		return nil, ErrLoadEnvVars
+		return nil, customErrors.ErrLoadEnvVars
 	}
 
 	var (
@@ -81,52 +78,32 @@ func LoadEnvs() (*Config, error) {
 
 	err = env.Parse(&dbCfg)
 	if err != nil {
-		return nil, errors.Wrap(ErrLoadEnvVars, "DB")
+		return nil, errors.Wrap(customErrors.ErrLoadEnvVars, "DB")
 	}
 
 	err = env.Parse(&tgConfig)
 	if err != nil {
-		return nil, errors.Wrap(ErrLoadEnvVars, "Telegram API")
+		return nil, errors.Wrap(customErrors.ErrLoadEnvVars, "Telegram API")
 	}
 
 	err = env.Parse(&lacesColor)
 	if err != nil {
-		return nil, errors.Wrap(ErrLoadEnvVars, "Lace colors")
+		return nil, errors.Wrap(customErrors.ErrLoadEnvVars, "Lace colors")
 	}
 
 	err = env.Parse(&salesOptions)
 	if err != nil {
-		return nil, errors.Wrap(ErrLoadEnvVars, "Sales options")
+		return nil, errors.Wrap(customErrors.ErrLoadEnvVars, "Sales options")
 	}
 
 	err = env.Parse(&sheet)
 	if err != nil {
-		return nil, errors.Wrap(ErrLoadEnvVars, "Google Sheets")
+		return nil, errors.Wrap(customErrors.ErrLoadEnvVars, "Google Sheets")
 	}
 
 	err = env.Parse(&tmpAllowList)
 	if err != nil {
-		return nil, errors.Wrap(ErrLoadEnvVars, "List of allowed users")
-	}
-
-	allowedSellersMap := make(map[string]bool)
-	for _, seller := range tmpAllowList.AllowedSellers {
-		allowedSellersMap[seller] = true
-	}
-
-	allowedCheckersMap := make(map[string]bool)
-	for _, checker := range tmpAllowList.AllowedCheckers {
-		allowedCheckersMap[checker] = true
-	}
-
-	vipSellerMap := make(map[string]bool)
-	for _, vipSellers := range tmpAllowList.VIPSellers {
-		vipSellerMap[vipSellers] = true
-	}
-
-	ssSellerMap := make(map[string]bool)
-	for _, ssSeller := range tmpAllowList.SSSellers {
-		ssSellerMap[ssSeller] = true
+		return nil, errors.Wrap(customErrors.ErrLoadEnvVars, "List of allowed users")
 	}
 
 	cfg := &Config{
@@ -136,12 +113,21 @@ func LoadEnvs() (*Config, error) {
 		SalesOption: salesOptions,
 		Sheet:       sheet,
 		AllowList: AllowList{
-			AllowedSellers:  allowedSellersMap,
-			AllowedCheckers: allowedCheckersMap,
-			VIPSellers:      vipSellerMap,
-			SSSellers:       ssSellerMap,
+			AllowedSellers:  SliceToMap(tmpAllowList.AllowedSellers),
+			AllowedCheckers: SliceToMap(tmpAllowList.AllowedCheckers),
+			VIPSellers:      SliceToMap(tmpAllowList.VIPSellers),
+			SSSellers:       SliceToMap(tmpAllowList.SSSellers),
 		},
 	}
 
 	return cfg, nil
+}
+
+func SliceToMap(userSlice []string) map[string]bool {
+	mp := make(map[string]bool, len(userSlice))
+	for _, user := range userSlice {
+		mp[user] = true
+	}
+
+	return mp
 }

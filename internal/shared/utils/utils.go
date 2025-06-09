@@ -225,9 +225,5 @@ func GetSurnameLowercase(surname string) string {
 }
 
 func UserInList(userName string, list map[string]bool) bool {
-	_, ok := list[userName]
-	if !ok {
-		return false
-	}
-	return true
+	return list[userName]
 }
