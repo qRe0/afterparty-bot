@@ -26,7 +26,7 @@ const (
 	connectingStringTemplate = "postgres://%s:%s@%s:%s/%s?sslmode=disable"
 
 	findClientByFullSurname = "SELECT ticketno, full_name, ticket_type, passed_control_zone FROM tickets WHERE surname=$1"
-	findClientBySurname     = "SELECT ticketno, full_name, ticket_type, passed_control_zone FROM tickets WHERE surname LIKE $1"
+	findClientBySurname     = "SELECT ticketno, full_name, ticket_type, passed_control_zone, surname FROM tickets WHERE surname LIKE $1"
 	updateQuery             = "UPDATE tickets SET passed_control_zone = true WHERE ticketno = $1 RETURNING ticketno, full_name, ticket_type, passed_control_zone"
 	searchById              = "SELECT ticketno, full_name, ticket_type, passed_control_zone FROM tickets WHERE ticketno=$1"
 	sellTicket              = "INSERT INTO tickets (surname, full_name, ticket_type, seller_name, ticket_price, actual_ticket_price, ticketno) VALUES ($1, $2, $3, $4, $5, $6, (SELECT COALESCE(MAX(ticketNo), 0) + 1 FROM tickets)) RETURNING ticketNo"
@@ -65,7 +65,7 @@ func (tr *TicketsRepo) SearchBySurname(ctx context.Context, surname string) ([]m
 	var users []models.TicketResponse
 	for rows.Next() {
 		var user models.TicketResponse
-		err := rows.Scan(&user.Id, &user.Name, &user.TicketType, &user.PassedControlZone)
+		err := rows.Scan(&user.Id, &user.Name, &user.TicketType, &user.PassedControlZone, &user.Surname)
 		if err != nil {
 			return nil, err
 		}

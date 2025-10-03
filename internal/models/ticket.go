@@ -3,6 +3,7 @@ package models
 type TicketResponse struct {
 	Id                string `json:"id"`
 	Name              string `json:"full_name"`
+	Surname           string `json:"surname"`
 	TicketType        string `json:"ticket_type"`
 	PassedControlZone bool   `json:"passed_control_zone]"`
 }

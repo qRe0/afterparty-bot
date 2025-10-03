@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/agnivade/levenshtein"
 	"github.com/pkg/errors"
 	"github.com/qRe0/afterparty-bot/internal/shared/logger"
 	"github.com/qRe0/afterparty-bot/internal/shared/utils"
@@ -70,41 +71,42 @@ func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, 
 	}
 
 	formattedSurname := strings.ToLower(*surname)
-	formattedSurname = strings.Replace(formattedSurname, "ё", "е", -1)
-	partSurnameToSearch := formattedSurname + "%"
-	respList, err := ts.repo.SearchBySurname(ctx, partSurnameToSearch)
+	formattedSurname = strings.ReplaceAll(formattedSurname, "ё", "е")
+
+	partSurnameToSearch := string([]rune(formattedSurname)[0]) + "%"
+	allTickets, err := ts.repo.SearchBySurname(ctx, partSurnameToSearch)
 	if err != nil {
-		lgr.Error("TicketService:: SearchBySurname_1:: Repository method returned error", zap.Error(err))
-		msg := "Ошибка при поиске по фамилии"
+		lgr.Error("TicketService:: SearchBySurname:: Repository GetAllTickets returned error", zap.Error(err))
+		msg := "Ошибка при получении данных из базы"
 		return nil, msg, err
 	}
-	if len(respList) == 0 {
-		lgr.Debug("TicketService:: SearchBySurname:: No clients found by part of surname")
-		lgr.Debug("TicketService:: SearchBySurname:: Trying to find client by full surname")
-		fullSurnameToSearch := formattedSurname
-		newRespList, err := ts.repo.SearchBySurname(ctx, fullSurnameToSearch)
-		if err != nil {
-			lgr.Error("TicketService:: SearchBySurname_2:: Repository method returned error", zap.Error(err))
-			msg := "Ошибка при поиске по фамилии"
-			return nil, msg, err
+
+	var foundTickets []models.TicketResponse
+	const maxDistance = 3
+
+	for _, ticket := range allTickets {
+		distance := levenshtein.ComputeDistance(formattedSurname, ticket.Surname)
+
+		if distance <= maxDistance {
+			foundTickets = append(foundTickets, ticket)
 		}
-		if len(newRespList) == 0 {
-			lgr.Info("TicketService:: SearchBySurname:: No clients found with specified surname")
-			msg := "Не удалось найти клиента с указанной фамилией"
-			return nil, msg, err
-		}
+	}
+
+	if len(foundTickets) == 0 {
+		lgr.Info("TicketService:: SearchBySurname:: No clients found with specified surname via Levenshtein")
+		msg := "Не удалось найти клиента с указанной фамилией, даже с учетом опечаток."
+		return nil, msg, nil
 	}
 	lgr.Info("TicketsService:: SearchBySurname:: Repository method returned result successfully")
 
 	var result strings.Builder
-	result.WriteString("Найдены следующие покупатели:\n\n")
-	for _, resp := range respList {
+	result.WriteString("Найдены следующие покупатели (с учетом возможных опечаток):\n\n")
+	for _, resp := range foundTickets {
 		result.WriteString(utils.ResponseMapper(&resp, ts.Cfg.LacesColor) + "\n\n")
 	}
 
 	lgr.Info("TicketsService:: Finished SearchBySurname method call")
-
-	return respList, result.String(), nil
+	return foundTickets, result.String(), nil
 }
 
 func (ts *TicketsService) SearchById(ctx context.Context, userId *string, chatID *int64, bot *tgbotapi.BotAPI) (*models.TicketResponse, string, error) {
