@@ -302,9 +302,9 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 	const (
 		backgroundPath = "assets/ticket.png"
 		fontPath       = "assets/font.ttf"
-		fontSize       = 105
-		posX, posY     = 970, 515
-		hexColor       = "#832f2e"
+		fontSize       = 75
+		posX, posY     = 323, 920
+		hexColor       = "#e9e9e9ff"
 	)
 
 	bg, err := gg.LoadImage(backgroundPath)
