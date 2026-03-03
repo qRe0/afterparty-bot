@@ -310,11 +310,9 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 		backgroundPath = "assets/ticket.png"
 		fontPath       = "assets/font.ttf"
 		fontSize       = 135
-		posX, posY     = 1500, 1400
+		posX, posY     = 1490, 1430
 		hexColor       = "#ffffff"
 	)
-
-	ticketNo = 333
 
 	bg, err := gg.LoadImage(backgroundPath)
 	if err != nil {
