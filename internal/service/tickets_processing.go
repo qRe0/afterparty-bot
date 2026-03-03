@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -22,7 +23,6 @@ import (
 	"github.com/qRe0/afterparty-bot/internal/configs"
 	errs "github.com/qRe0/afterparty-bot/internal/errors"
 	"github.com/qRe0/afterparty-bot/internal/models"
-	ticket_repository "github.com/qRe0/afterparty-bot/internal/repository"
 )
 
 type TicketsRepo interface {
@@ -35,16 +35,23 @@ type TicketsRepo interface {
 }
 
 type TicketsService struct {
-	repo *ticket_repository.TicketsRepo
-	Cfg  configs.Config
-	mu   sync.Mutex
+	repo                  TicketsRepo
+	Cfg                   configs.Config
+	mu                    sync.Mutex
+	nowFn                 func() time.Time
+	httpPostFn            func(url, contentType string, body io.Reader) (*http.Response, error)
+	generateTicketImageFn func(ticketNo int64) (*bytes.Buffer, error)
 }
 
-func New(repo *ticket_repository.TicketsRepo, cfg configs.Config) *TicketsService {
-	return &TicketsService{
-		repo: repo,
-		Cfg:  cfg,
+func New(repo TicketsRepo, cfg configs.Config) *TicketsService {
+	service := &TicketsService{
+		repo:       repo,
+		Cfg:        cfg,
+		nowFn:      time.Now,
+		httpPostFn: http.Post,
 	}
+	service.generateTicketImageFn = service.generateTicketImage
+	return service
 }
 
 func (ts *TicketsService) SearchBySurname(ctx context.Context, surname *string, chatID *int64, bot *tgbotapi.BotAPI) ([]models.TicketResponse, string, error) {
@@ -210,7 +217,7 @@ func (ts *TicketsService) SellTicket(
 	lgr.Debug("TicketsService:: SellTicket:: Starting data preparation to call repository layer")
 	client.FIO = strings.Title(client.FIO)
 	clientSurname := utils.GetSurnameLowercase(client.FIO)
-	actualTicketPrice := utils.CalculateActualTicketPrice(time.Now(), ts.Cfg.SalesOption, *client)
+	actualTicketPrice := utils.CalculateActualTicketPrice(ts.nowFn(), ts.Cfg.SalesOption, *client)
 	sellerTag := "@" + update.Message.From.UserName
 	sellerId := update.Message.From.ID
 	client.TicketType = strings.ToUpper(client.TicketType)
@@ -253,7 +260,7 @@ func (ts *TicketsService) SellTicket(
 
 	lgr.Debug("TicketsService:: SellTicket:: Trying to generate ticket image")
 	ticketGenerated := true
-	imageBuffer, err := ts.generateTicketImage(ticketNo)
+	imageBuffer, err := ts.generateTicketImageFn(ticketNo)
 	if err != nil {
 		ticketGenerated = false
 		lgr.Error("TicketService:: SellTicket:: Can't generate ticket image with error: ", zap.Error(err))
@@ -285,7 +292,7 @@ func (ts *TicketsService) addRowToGoogleSheet(client models.ClientData, sellerTa
 		return err
 	}
 
-	resp, err := http.Post(ts.Cfg.Sheet.DeploymentURL, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := ts.httpPostFn(ts.Cfg.Sheet.DeploymentURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
@@ -302,10 +309,12 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 	const (
 		backgroundPath = "assets/ticket.png"
 		fontPath       = "assets/font.ttf"
-		fontSize       = 75
-		posX, posY     = 323, 920
-		hexColor       = "#e9e9e9ff"
+		fontSize       = 135
+		posX, posY     = 1500, 1400
+		hexColor       = "#ffffff"
 	)
+
+	ticketNo = 333
 
 	bg, err := gg.LoadImage(backgroundPath)
 	if err != nil {
