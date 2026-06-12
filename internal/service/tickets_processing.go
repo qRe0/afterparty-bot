@@ -309,8 +309,8 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 	const (
 		backgroundPath = "assets/ticket.png"
 		fontPath       = "assets/font.ttf"
-		fontSize       = 135
-		posX, posY     = 1490, 1430
+		fontSize       = 110
+		posX, posY     = 889, 300
 		hexColor       = "#ffffff"
 	)
 
