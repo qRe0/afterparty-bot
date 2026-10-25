@@ -69,7 +69,16 @@ VIP_SELLER=...
 SS_SELLER=...
 
 APP_ENV=prod/dev
+
+TICKET_NUMBER_POS_X=...
+TICKET_NUMBER_POS_Y=...
+TICKET_NUMBER_FONT_SIZE=...
+TICKET_NUMBER_COLOR=#ffffff
 ```
+
+`TICKET_NUMBER_POS_X`, `TICKET_NUMBER_POS_Y`, and `TICKET_NUMBER_FONT_SIZE`
+are required. `TICKET_NUMBER_COLOR` is optional and defaults to `#ffffff`.
+X/Y are the center of the number on the ticket image.
 
 ### Installation
 
@@ -125,10 +134,36 @@ afterparty-bot/
 │   ├── models/           # Domain models
 │   ├── repository/       # Data access layer
 │   ├── service/          # Business logic
-│   └── shared/           # Shared utilities
+│   ├── shared/           # Shared utilities
+│   └── tools/            # Developer-only internal tools
 ├── assets/               # Static assets
 └── go.mod                # Go module definition
 ```
+
+### Ticket Layout Tool
+
+Use the local tool to position the ticket number on `assets/ticket.png` before
+a selling phase.
+
+```bash
+cd internal/tools/ticket-layout
+npm ci
+npm run dev
+```
+
+Open the printed localhost URL. The tool loads `assets/ticket.png` and
+`assets/font.ttf` automatically. Drag the number, resize it with the corner
+handle or the numeric input, choose a color, and open the results dialog. Copy
+the four lines into `.env`, then restart the bot.
+
+The tool shows temporary center guides after each adjustment and a persistent
+visual-center offset readout. The guides are visual only; they do not snap or
+change the exported values.
+
+The tool is developer-only and never writes `.env`. Chrome is the primary
+browser; current Safari is supported. The committed font asset is normalized
+for browser loading; if you replace `assets/font.ttf`, verify it loads in Chrome
+before using the tool.
 
 ### Adding New Features
 
@@ -151,4 +186,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 👥 Authors
 
-- **qRe0** - [GitHub](https://github.com/qRe0) 
+- **qRe0** - [GitHub](https://github.com/qRe0)

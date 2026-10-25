@@ -309,29 +309,59 @@ func (ts *TicketsService) generateTicketImage(ticketNo int64) (*bytes.Buffer, er
 	const (
 		backgroundPath = "assets/ticket.png"
 		fontPath       = "assets/font.ttf"
-		fontSize       = 110
-		posX, posY     = 889, 300
-		hexColor       = "#ffffff"
 	)
 
 	bg, err := gg.LoadImage(backgroundPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load background image: %v", err)
+		return nil, fmt.Errorf("failed to load background image: %w", err)
+	}
+
+	cfg := ts.Cfg.TicketImage
+	width, height := bg.Bounds().Dx(), bg.Bounds().Dy()
+
+	if cfg.NumberPosX < 0 || cfg.NumberPosX >= width {
+		return nil, fmt.Errorf(
+			"TICKET_NUMBER_POS_X %d is outside ticket width %d",
+			cfg.NumberPosX,
+			width,
+		)
+	}
+	if cfg.NumberPosY < 0 || cfg.NumberPosY >= height {
+		return nil, fmt.Errorf(
+			"TICKET_NUMBER_POS_Y %d is outside ticket height %d",
+			cfg.NumberPosY,
+			height,
+		)
+	}
+	if cfg.NumberFontSize <= 0 {
+		return nil, fmt.Errorf(
+			"TICKET_NUMBER_FONT_SIZE must be > 0, got %d",
+			cfg.NumberFontSize,
+		)
+	}
+	if cfg.NumberColor == "" {
+		return nil, fmt.Errorf("TICKET_NUMBER_COLOR must not be empty")
 	}
 
 	dc := gg.NewContextForImage(bg)
 
-	if err := dc.LoadFontFace(fontPath, fontSize); err != nil {
-		return nil, fmt.Errorf("failed to load font: %v", err)
+	if err := dc.LoadFontFace(fontPath, float64(cfg.NumberFontSize)); err != nil {
+		return nil, fmt.Errorf("failed to load font: %w", err)
 	}
 
-	dc.SetHexColor(hexColor)
+	dc.SetHexColor(cfg.NumberColor)
 	ticketText := fmt.Sprintf("%d", ticketNo)
-	dc.DrawStringAnchored(ticketText, posX, posY, 0.5, 0.5)
+	dc.DrawStringAnchored(
+		ticketText,
+		float64(cfg.NumberPosX),
+		float64(cfg.NumberPosY),
+		0.5,
+		0.5,
+	)
 
 	var buf bytes.Buffer
 	if err := dc.EncodePNG(&buf); err != nil {
-		return nil, fmt.Errorf("failed to encode .png file: %v", err)
+		return nil, fmt.Errorf("failed to encode .png file: %w", err)
 	}
 
 	return &buf, nil
