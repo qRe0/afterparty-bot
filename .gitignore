@@ -30,3 +30,7 @@ go.work.sum
 .vscode
 .fleet
 .env
+
+# Ticket layout tool
+internal/tools/ticket-layout/node_modules/
+internal/tools/ticket-layout/dist/

@@ -1,6 +1,10 @@
 package configs
 
 import (
+	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/caarlos0/env"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
@@ -52,6 +56,17 @@ type AllowList struct {
 	SSSellers       map[string]bool
 }
 
+type TicketImageConfig struct {
+	NumberPosX     int    `env:"TICKET_NUMBER_POS_X,required"`
+	NumberPosY     int    `env:"TICKET_NUMBER_POS_Y,required"`
+	NumberFontSize int    `env:"TICKET_NUMBER_FONT_SIZE,required"`
+	NumberColor    string `env:"TICKET_NUMBER_COLOR"`
+}
+
+const defaultTicketNumberColor = "#ffffff"
+
+var ticketNumberColorPattern = regexp.MustCompile(`^#?[0-9a-fA-F]{6}$`)
+
 type Config struct {
 	DB          DBConfig
 	TG          TelegramAPIConfig
@@ -59,6 +74,7 @@ type Config struct {
 	SalesOption SalesOptions
 	Sheet       GoogleSheets
 	AllowList   AllowList
+	TicketImage TicketImageConfig
 }
 
 func LoadEnvs() (*Config, error) {
@@ -74,6 +90,7 @@ func LoadEnvs() (*Config, error) {
 		salesOptions SalesOptions
 		sheet        GoogleSheets
 		tmpAllowList tempAllowList
+		ticketImage  TicketImageConfig
 	)
 
 	err = env.Parse(&dbCfg)
@@ -106,12 +123,23 @@ func LoadEnvs() (*Config, error) {
 		return nil, errors.Wrap(customErrors.ErrLoadEnvVars, "List of allowed users")
 	}
 
+	err = env.Parse(&ticketImage)
+	if err != nil {
+		return nil, errors.Wrap(customErrors.ErrLoadEnvVars, "Ticket image")
+	}
+
+	ticketImage, err = normalizeTicketImageConfig(ticketImage)
+	if err != nil {
+		return nil, fmt.Errorf("%w: ticket image: %v", customErrors.ErrLoadEnvVars, err)
+	}
+
 	cfg := &Config{
 		DB:          dbCfg,
 		TG:          tgConfig,
 		LacesColor:  lacesColor,
 		SalesOption: salesOptions,
 		Sheet:       sheet,
+		TicketImage: ticketImage,
 		AllowList: AllowList{
 			AllowedSellers:  SliceToMap(tmpAllowList.AllowedSellers),
 			AllowedCheckers: SliceToMap(tmpAllowList.AllowedCheckers),
@@ -130,4 +158,38 @@ func SliceToMap(userSlice []string) map[string]bool {
 	}
 
 	return mp
+}
+
+func normalizeTicketImageConfig(cfg TicketImageConfig) (TicketImageConfig, error) {
+	if cfg.NumberPosX < 0 {
+		return cfg, fmt.Errorf("TICKET_NUMBER_POS_X must be >= 0, got %d", cfg.NumberPosX)
+	}
+	if cfg.NumberPosY < 0 {
+		return cfg, fmt.Errorf("TICKET_NUMBER_POS_Y must be >= 0, got %d", cfg.NumberPosY)
+	}
+	if cfg.NumberFontSize <= 0 {
+		return cfg, fmt.Errorf(
+			"TICKET_NUMBER_FONT_SIZE must be > 0, got %d",
+			cfg.NumberFontSize,
+		)
+	}
+
+	color := strings.TrimSpace(cfg.NumberColor)
+	if color == "" {
+		cfg.NumberColor = defaultTicketNumberColor
+		return cfg, nil
+	}
+
+	if !ticketNumberColorPattern.MatchString(color) {
+		return cfg, fmt.Errorf(
+			"TICKET_NUMBER_COLOR must be a six-digit hex color, got %q",
+			cfg.NumberColor,
+		)
+	}
+	if !strings.HasPrefix(color, "#") {
+		color = "#" + color
+	}
+	cfg.NumberColor = strings.ToLower(color)
+
+	return cfg, nil
 }
